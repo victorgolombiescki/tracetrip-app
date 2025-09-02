@@ -190,13 +190,13 @@ export default function AgendasScreen() {
 
   const formatDateTime = (dateString: string) => {
     try {
-      // Garantir que a data seja tratada como UTC para evitar problemas de timezone
       const isoDate = new Date(dateString).toISOString();
       const date = new Date(isoDate);
+      date.setHours(date.getHours() - 3);
       
       return {
-        date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' }),
-        time: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+        date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        time: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
       };
     } catch (e) {
       return { date: '', time: '' };
@@ -251,11 +251,9 @@ export default function AgendasScreen() {
         style={styles.cardContainer}
       >
         <View style={styles.agendaCard}>
-          {/* Barra lateral colorida indicando o status */}
           <View style={[styles.statusBar, { backgroundColor: theme.border }]} />
           
           <View style={styles.agendaContent}>
-            {/* Cabeçalho com título e badges */}
             <View style={styles.agendaHeader}>
               <Text style={styles.agendaTitle} numberOfLines={1}>{item.titulo}</Text>
               <View style={styles.badgesContainer}>
@@ -271,7 +269,6 @@ export default function AgendasScreen() {
               </View>
             </View>
 
-            {/* Detalhes do compromisso */}
             <View style={styles.agendaDetails}>
               <View style={styles.timeInfo}>
                 <View style={styles.iconBackground}>
@@ -415,26 +412,26 @@ export default function AgendasScreen() {
                 theme={{
                   backgroundColor: 'transparent',
                   calendarBackground: 'white',
-                  todayTextColor: '#1E40AF',
-                  dayTextColor: '#111827',
-                  arrowColor: '#1E40AF',
-                  monthTextColor: '#111827',
-                  textMonthFontWeight: '800',
+                  todayTextColor: '#2563EB',
+                  dayTextColor: '#333333',
+                  arrowColor: '#2563EB',
+                  monthTextColor: '#333333',
+                  textMonthFontWeight: '700',
                   textMonthFontFamily: 'System',
                   textDayFontFamily: 'System',
                   textDayHeaderFontFamily: 'System',
-                  textDayFontWeight: '700',
-                  textDayHeaderFontWeight: '700',
+                  textDayFontWeight: '600',
+                  textDayHeaderFontWeight: '600',
                   textDisabledColor: '#9CA3AF',
-                  selectedDayBackgroundColor: '#1E40AF',
+                  selectedDayBackgroundColor: '#2563EB',
                   selectedDayTextColor: '#fff',
-                  dotColor: '#1E40AF',
+                  dotColor: '#2563EB',
                   selectedDotColor: '#fff',
                   dotStyle: {
-                    width: 6,
-                    height: 6,
-                    borderRadius: 3,
-                    marginTop: 2
+                    width: 5,
+                    height: 5,
+                    borderRadius: 2.5,
+                    marginTop: 1
                   }
                 }}
                 onVisibleMonthsChange={(months) => {
@@ -444,6 +441,82 @@ export default function AgendasScreen() {
                   }
                 }}
               />
+            </View>
+            
+            <View style={styles.monthSummaryContainer}>
+              <Text style={styles.monthSummaryTitle}>
+                {new Date(calendarDate).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+              </Text>
+              
+              <View style={styles.calendarInfoCards}>
+                <View style={styles.calendarInfoCard}>
+                  <View style={styles.calendarInfoIconContainer}>
+                    <CalendarIcon size={20} color="#2563EB" />
+                  </View>
+                  <View style={styles.calendarInfoContent}>
+                    <Text style={styles.calendarInfoLabel}>Semanas</Text>
+                    <Text style={styles.calendarInfoValue}>
+                      {Math.ceil(new Date(
+                        new Date(calendarDate).getFullYear(),
+                        new Date(calendarDate).getMonth() + 1,
+                        0
+                      ).getDate() / 7)}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.calendarInfoCard}>
+                  <View style={styles.calendarInfoIconContainer}>
+                    <Clock size={20} color="#2563EB" />
+                  </View>
+                  <View style={styles.calendarInfoContent}>
+                    <Text style={styles.calendarInfoLabel}>Dias</Text>
+                    <Text style={styles.calendarInfoValue}>
+                      {new Date(
+                        new Date(calendarDate).getFullYear(),
+                        new Date(calendarDate).getMonth() + 1,
+                        0
+                      ).getDate()}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              
+              <View style={styles.calendarInfoCards}>
+                <View style={styles.calendarInfoCard}>
+                  <View style={styles.calendarInfoIconContainer}>
+                    <MapPin size={20} color="#2563EB" />
+                  </View>
+                  <View style={styles.calendarInfoContent}>
+                    <Text style={styles.calendarInfoLabel}>Primeiro Dia</Text>
+                    <Text style={styles.calendarInfoValue}>
+                      {new Date(
+                        new Date(calendarDate).getFullYear(),
+                        new Date(calendarDate).getMonth(),
+                        1
+                      ).toLocaleDateString('pt-BR', { weekday: 'short' })}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.calendarInfoCard}>
+                  <View style={styles.calendarInfoIconContainer}>
+                    <CheckSquare size={20} color="#2563EB" />
+                  </View>
+                  <View style={styles.calendarInfoContent}>
+                    <Text style={styles.calendarInfoLabel}>Último Dia</Text>
+                    <Text style={styles.calendarInfoValue}>
+                      {new Date(
+                        new Date(calendarDate).getFullYear(),
+                        new Date(calendarDate).getMonth() + 1,
+                        0
+                      ).toLocaleDateString('pt-BR', { weekday: 'short' })}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              
+
             </View>
           </View>
         ) : (
@@ -513,13 +586,115 @@ export default function AgendasScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#F6F7FB' 
+    backgroundColor: '#FFFFFF' 
   },
+  monthSummaryContainer: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    marginTop: 8,
+    marginHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  monthSummaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 16,
+    textAlign: 'center',
+    textTransform: 'capitalize',
+  },
+  calendarInfoCards: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 10,
+  },
+  calendarInfoCard: {
+    flex: 1,
+    backgroundColor: '#F5F9FF',
+    padding: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  calendarInfoIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: 'rgba(37,99,235,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  calendarInfoContent: {
+    flex: 1,
+  },
+  calendarInfoLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  calendarInfoValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  upcomingEventsContainer: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  upcomingEventsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563EB',
+    paddingLeft: 8,
+  },
+  upcomingEventItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  upcomingEventDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#2563EB',
+    marginRight: 10,
+  },
+  upcomingEventContent: {
+    flex: 1,
+  },
+  upcomingEventTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#333333',
+  },
+  upcomingEventDate: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  noEventsText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 12,
+  },
+
   hero: { 
-    paddingHorizontal: 16, 
-    paddingTop: 16, 
-    paddingBottom: 12, 
-    borderBottomRightRadius: 28 
+    paddingHorizontal: 20, 
+    paddingTop: 8, 
+    paddingBottom: 16, 
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24
   },
   heroRow: { 
     flexDirection: 'row', 
@@ -532,32 +707,33 @@ const styles = StyleSheet.create({
     gap: 12 
   },
   heroIconContainer: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 12, 
+    width: 36, 
+    height: 36, 
+    borderRadius: 10, 
     backgroundColor: 'rgba(255,255,255,0.2)', 
     justifyContent: 'center', 
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
   },
   heroTitle: { 
     color: 'white', 
-    fontSize: 22, 
+    fontSize: 20, 
     fontWeight: '700' 
   },
   heroSubtitle: { 
-    color: 'rgba(255,255,255,0.9)' 
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12
   },
   calendarToggle: {
     padding: 8,
   },
   calendarToggleIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -566,42 +742,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#F1F5F9',
   },
   currentDateTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333333',
   },
   eventCountBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: 'rgba(37,99,235,0.06)',
     borderRadius: 999,
   },
   eventCountText: {
-    fontSize: 12,
-    color: '#1E40AF',
+    fontSize: 11,
+    color: '#2563EB',
     fontWeight: '600',
   },
   calendarContainer: { 
-    paddingHorizontal: 12, 
-    paddingVertical: 16,
+    paddingTop: 12,
     backgroundColor: 'white',
   },
   calendarCard: {
     backgroundColor: 'white',
-    borderRadius: 16,
+    borderRadius: 8,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginHorizontal: 20,
   },
   loadingContainer: { 
     flex: 1, 
@@ -609,163 +782,157 @@ const styles = StyleSheet.create({
     alignItems: 'center' 
   },
   loadingText: { 
-    fontSize: 16, 
+    fontSize: 14, 
     color: '#6B7280' 
   },
   listContainer: { 
-    paddingVertical: 16,
+    paddingVertical: 12,
     paddingBottom: 100,
     paddingHorizontal: 0,
   },
-  // Estilos atualizados para os cards de agenda
   cardContainer: {
-    marginHorizontal: 16,
-    marginBottom: 12,
+    marginHorizontal: 20,
+    marginBottom: 8,
   },
   agendaCard: { 
-    borderRadius: 12,
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 8,
+    backgroundColor: '#F5F9FF',
     overflow: 'hidden',
     flexDirection: 'row',
+    borderWidth: 0,
   },
   statusBar: {
-    width: 6,
-    backgroundColor: '#1E40AF',
+    width: 4,
+    backgroundColor: '#2563EB',
   },
   agendaContent: {
     flex: 1,
-    padding: 16,
+    padding: 12,
   },
   agendaHeader: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'flex-start', 
-    marginBottom: 12
+    marginBottom: 8
   },
   agendaTitle: { 
-    fontSize: 16, 
-    fontWeight: '700', 
-    color: '#111827', 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: '#333333', 
     flex: 1,
-    marginRight: 8
+    marginRight: 6
   },
   badgesContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     flexWrap: 'wrap',
     justifyContent: 'flex-end'
   },
   divider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 8
+    backgroundColor: '#F1F5F9',
+    marginVertical: 6
   },
   checklistBadge: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    gap: 4, 
-    backgroundColor: '#EEF2FF', 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
-    borderRadius: 12 
+    gap: 3, 
+    backgroundColor: 'rgba(37,99,235,0.06)', 
+    paddingHorizontal: 6, 
+    paddingVertical: 3, 
+    borderRadius: 8 
   },
   checklistText: { 
-    fontSize: 11, 
-    color: '#1E40AF', 
+    fontSize: 10, 
+    color: '#2563EB', 
     fontWeight: '600' 
   },
   statusBadge: { 
-    backgroundColor:'#EEF2FF', 
-    borderColor:'#C7D2FE', 
-    borderWidth:1, 
-    paddingHorizontal:8, 
-    paddingVertical:3, 
+    backgroundColor:'rgba(37,99,235,0.06)', 
+    borderColor:'transparent', 
+    paddingHorizontal:6, 
+    paddingVertical:2, 
     borderRadius:999 
   },
   statusBadgeText: { 
-    fontSize: 11, 
-    color:'#1E40AF', 
-    fontWeight:'700', 
+    fontSize: 10, 
+    color:'#2563EB', 
+    fontWeight:'600', 
     textTransform:'capitalize' 
   },
   agendaDetails: { 
-    gap: 12
+    gap: 8
   },
   timeInfo: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    gap: 12
+    gap: 8
   },
   timeText: { 
-    fontSize: 14, 
+    fontSize: 12, 
     color: '#6B7280',
     fontWeight: '500'
   },
   dateText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#9CA3AF',
     marginLeft: 'auto'
   },
   locationInfo: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    gap: 12
+    gap: 8
   },
   locationText: { 
-    fontSize: 14, 
+    fontSize: 12, 
     color: '#6B7280',
     flex: 1
   },
   recipientContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   recipientText: { 
-    fontSize: 14, 
+    fontSize: 12, 
     color: '#6B7280',
   },
   description: { 
-    fontSize: 14, 
+    fontSize: 12, 
     color: '#6B7280', 
-    lineHeight: 20,
-    marginTop: 8,
-    paddingLeft: 40
+    lineHeight: 18,
+    marginTop: 6,
+    paddingLeft: 36
   },
   iconBackground: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#EEF2FF',
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: 'rgba(37,99,235,0.06)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   iconText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#1E40AF',
+    color: '#2563EB',
   },
   emptyContainer: { 
     flex: 1, 
     justifyContent: 'center', 
     alignItems: 'center', 
     paddingHorizontal: 40,
-    paddingVertical: 60,
+    paddingVertical: 40,
   },
   emptyText: { 
-    fontSize: 18, 
+    fontSize: 16, 
     fontWeight: '600', 
-    color: '#111827', 
-    marginBottom: 8 
+    color: '#333333', 
+    marginBottom: 6 
   },
   emptySubtext: { 
-    fontSize: 14, 
+    fontSize: 13, 
     color: '#6B7280', 
     textAlign: 'center' 
   },

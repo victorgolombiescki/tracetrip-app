@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert, KeyboardAvoidingView, Platform, TouchableOpacity, TextInput, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Alert, KeyboardAvoidingView, Platform, TouchableOpacity, TextInput, Modal, Pressable, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -11,6 +11,7 @@ import { useAppStore } from '@/src/store/useAppStore';
 import { apiClient } from '@/src/services/api/ApiClient';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'react-native';
 
 const loginSchema = z.object({
   email: z.string().email('E-mail inválido').min(1, 'E-mail é obrigatório'),
@@ -36,7 +37,7 @@ export default function LoginScreen() {
   const { control, handleSubmit, formState: { errors }, watch } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'contato@traceai.com.br',
+      email: '',
       senha: '',
     }
   });
@@ -67,7 +68,7 @@ export default function LoginScreen() {
           visibilityTime: 5000,
           topOffset: 60,
         });
-        
+
 
       } else if (error.status === 500 || error.status >= 500) {
         Toast.show({
@@ -108,8 +109,9 @@ export default function LoginScreen() {
     <>
       <StatusBar style="light" />
       <View style={[styles.statusBarBackground, { height: insets.top }]} />
+      <View style={styles.backgroundTop} />
       <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           style={styles.keyboardView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
@@ -120,6 +122,14 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.content}>
+            <View style={styles.imageContainer}>
+              <Image 
+                source={require('../assets/logo.png')} 
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
+
             <Text style={styles.title}>Bem-vindo ao TraceTrip</Text>
 
             <View style={styles.form}>
@@ -180,7 +190,7 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.loginButton, loading && styles.loginButtonDisabled]}
                 onPress={handleSubmit(onSubmit)}
                 disabled={loading}
@@ -219,16 +229,16 @@ export default function LoginScreen() {
                       setResetError('Informe o e-mail.');
                       return;
                     }
-                    
-                    setResetError(null); 
+
+                    setResetError(null);
                     const resp = await apiClient.solicitarTrocaSenhaLogin(email);
-                    
+
                     if (!resp.success) {
                       const apiMsg = resp.message || (resp.data as any)?.message || 'Falha ao solicitar';
                       setResetError(apiMsg);
                       return;
                     }
-                    
+
                     Alert.alert('Enviado', 'Se o e-mail existir, enviaremos instruções para redefinir sua senha.');
                     setResetOpen(false);
                     setResetEmail('');
@@ -265,16 +275,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E40AF',
     zIndex: 1,
   },
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  backgroundTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '45%',
+    backgroundColor: '#1E40AF',
+    zIndex: 0,
+  },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#FFFFFF',
+    position: 'relative',
+  },
   keyboardView: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10 },
   backButton: { padding: 8 },
   backIcon: { fontSize: 24, color: '#111827' },
   content: { flex: 1, paddingHorizontal: 32, paddingTop: 40 },
-  title: { fontSize: 28, fontWeight: '700', color: '#1E40AF', textAlign: 'center', marginBottom: 40 },
+  title: { 
+    fontSize: 20, 
+    fontWeight: '500', 
+    textAlign: 'left',
+    marginBottom: 30,
+    marginTop: 10,
+    letterSpacing: 0.2,
+  },
   form: { gap: 24 },
   inputContainer: { gap: 8 },
-  inputLabel: { fontSize: 16, fontWeight: '600', color: '#111827' },
+  inputLabel: { fontSize: 14, fontWeight: '500', color: '#4B5563', marginBottom: 4 },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingVertical: 12 },
   inputValid: { borderBottomColor: '#10B981' },
   input: { flex: 1, fontSize: 16, color: '#111827' },
@@ -295,4 +325,19 @@ const styles = StyleSheet.create({
   resetTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
   resetHint: { color: '#6B7280', marginTop: 4, marginBottom: 10 },
   resetErrorText: { color: '#DC2626', marginTop: 4 },
+  imageContainer: {
+    width: 80,
+    height: 80,
+    alignSelf: 'center',
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#1E40AF',
+    marginVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  logo: { 
+    width: '100%',
+    height: '100%',
+  },
 });

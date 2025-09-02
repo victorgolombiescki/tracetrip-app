@@ -48,7 +48,6 @@ const styles = StyleSheet.create({
   },
 });
 
-// Register the app
 AppRegistry.registerComponent('main', () => App);
 
 export default App; 

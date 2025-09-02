@@ -10,11 +10,12 @@ import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
 import { Ocorrencia, Rota } from '@/src/types';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Mic, Square, Settings } from 'lucide-react-native';
-import { Audio } from 'expo-av';
+import { ArrowLeft, Mic, Square, Settings, AlertCircle } from 'lucide-react-native';
+import { AudioModule, useAudioRecorder, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 import { RotasApi } from '@/src/services/api/modules/rotas';
 import { OcorrenciasApi } from '@/src/services/api/modules/ocorrencias';
 import Toast from 'react-native-toast-message';
+import { useAppStore } from '@/src/store/useAppStore';
 
 interface RotaSimples {
   id: string;
@@ -22,6 +23,7 @@ interface RotaSimples {
   dataInicio: string;
   dataFim: string;
   status: string;
+  isCurrent?: boolean;
 }
 
 const ocorrenciaSchema = z.object({
@@ -38,10 +40,11 @@ export default function NovaOcorrenciaScreen() {
   const [routePickerOpen, setRoutePickerOpen] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'checking'>('checking');
   const [transcribing, setTranscribing] = useState(false);
+  const { currentRoute } = useAppStore();
 
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const [isRecording, setIsRecording] = useState(false);
   const [audioUri, setAudioUri] = useState<string | null>(null);
-  const isRecording = !!recording;
 
   const { control, handleSubmit, setValue, getValues, formState: { errors } } = useForm<OcorrenciaForm>({
     resolver: zodResolver(ocorrenciaSchema),
@@ -60,38 +63,17 @@ export default function NovaOcorrenciaScreen() {
     try {
       setPermissionStatus('checking');
 
-      if (Platform.OS === 'android') {
-        const hasPermission = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+      const status = await AudioModule.requestRecordingPermissionsAsync();
 
-        if (hasPermission) {
-          setPermissionStatus('granted');
-          return;
-        }
+      if (status.granted) {
+        setPermissionStatus('granted');
 
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          {
-            title: 'Permissão de Microfone',
-            message: 'O TraceTrip precisa acessar o microfone para gravar áudio das ocorrências.',
-            buttonNeutral: 'Perguntar depois',
-            buttonNegative: 'Cancelar',
-            buttonPositive: 'OK',
-          }
-        );
-
-
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          setPermissionStatus('granted');
-        } else {
-          setPermissionStatus('denied');
-        }
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          allowsRecording: true,
+        });
       } else {
-        const permission = await Audio.requestPermissionsAsync();
-        if (permission.granted) {
-          setPermissionStatus('granted');
-        } else {
-          setPermissionStatus('denied');
-        }
+        setPermissionStatus('denied');
       }
     } catch (error) {
       setPermissionStatus('denied');
@@ -149,25 +131,28 @@ export default function NovaOcorrenciaScreen() {
   const loadRotas = async () => {
     try {
       const resp = await RotasApi.getRotasSimples();
+
       if (resp.success) {
-        const rotas = resp.data || [];
+        const rotas = (resp.data || []) as RotaSimples[];
 
         setRotas(rotas);
 
-        if (rotas.length > 0) {
+        const rotaAtual = rotas.find(rota => rota.isCurrent === true);
+        
+        if (rotaAtual) {
+          setValue('rotaId', rotaAtual.id);
+        } 
+        else if (rotas.length > 0) {
           setValue('rotaId', rotas[0].id);
         }
       }
-    } catch (e) {
-      console.error('🔍 Erro ao carregar rotas', e);
-    }
+    } catch (e) {}
   };
 
   const startRecording = async () => {
     try {
       if (permissionStatus !== 'granted') {
         await checkPermissions();
-
         await new Promise(resolve => setTimeout(resolve, 500));
 
         if (permissionStatus === 'denied' || permissionStatus === 'checking') {
@@ -176,39 +161,31 @@ export default function NovaOcorrenciaScreen() {
         }
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true
-      });
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
 
-      const { Recording } = Audio;
-      const rec = new Recording();
-
-      await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-
-      await rec.startAsync();
-
-      setRecording(rec);
+      setIsRecording(true);
       setAudioUri(null);
     } catch (e) {
-      console.error('🔍 Error details:', JSON.stringify(e, null, 2));
       Alert.alert('Erro', 'Não foi possível iniciar a gravação. Verifique as permissões.');
     }
   };
 
   const stopRecording = async () => {
     try {
+      if (!isRecording) {
+        return;
+      }
 
-      if (!recording) return;
+      await audioRecorder.stop();
 
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
+      const recorderState = audioRecorder.getStatus();
 
-      setRecording(null);
-      setAudioUri(uri || null);
+      setIsRecording(false);
 
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-      if (uri) {
+      if (recorderState && recorderState.url) {
+        const uri = recorderState.url;
+        setAudioUri(uri);
         setTranscribing(true);
 
         try {
@@ -225,14 +202,14 @@ export default function NovaOcorrenciaScreen() {
             Toast.show({ type: 'error', text1: 'Erro na transcrição', text2: resp.message || 'Não foi possível transcrever o áudio.' });
           }
         } catch (error) {
-          console.error('🔍 Transcription error:', error);
           Toast.show({ type: 'error', text1: 'Erro na transcrição', text2: 'Ocorreu um erro durante a transcrição.' });
         } finally {
           setTranscribing(false);
         }
+      } else {
+        Toast.show({ type: 'error', text1: 'Erro na gravação', text2: 'Não foi possível obter o arquivo de áudio.' });
       }
     } catch (e) {
-      console.error('🔍 Error stopping recording:', e);
       setTranscribing(false);
       Alert.alert('Erro', 'Erro ao parar a gravação.');
     }
@@ -251,7 +228,6 @@ export default function NovaOcorrenciaScreen() {
       Toast.show({ type: 'success', text1: 'Ocorrência registrada' });
       setTimeout(() => router.back(), 300);
     } catch (e) {
-      console.error('🔍 Erro ao registrar ocorrência:', e);
       Toast.show({ type: 'error', text1: 'Erro ao registrar', text2: 'Não foi possível registrar a ocorrência.' });
     } finally {
       setLoading(false);
@@ -272,7 +248,7 @@ export default function NovaOcorrenciaScreen() {
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>Permissão de microfone negada</Text>
           <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-            <Settings size={16} color="#1E40AF" />
+            <Settings size={16} color="#2563EB" />
             <Text style={styles.permissionButtonText}>Configurar Permissão</Text>
           </TouchableOpacity>
         </View>
@@ -287,7 +263,7 @@ export default function NovaOcorrenciaScreen() {
       {transcribing && (
         <View style={styles.processingOverlay}>
           <View style={styles.processingModal}>
-            <ActivityIndicator size="large" color="#1E40AF" />
+            <ActivityIndicator size="large" color="#2563EB" />
             <Text style={styles.processingTitle}>Aguarde...</Text>
             <Text style={styles.processingSubtitle}>Processando transcrição do áudio</Text>
           </View>
@@ -323,7 +299,7 @@ export default function NovaOcorrenciaScreen() {
               onPress={isRecording ? stopRecording : startRecording}
               disabled={permissionStatus !== 'granted'}
             >
-              {isRecording ? <Square size={18} color="#fff" /> : <Mic size={18} color={permissionStatus === 'granted' ? "#1E40AF" : "#9CA3AF"} />}
+              {isRecording ? <Square size={18} color="#fff" /> : <Mic size={18} color={permissionStatus === 'granted' ? "#2563EB" : "#9CA3AF"} />}
               <Text style={[
                 styles.audioText,
                 isRecording && { color: '#fff' },
@@ -336,7 +312,7 @@ export default function NovaOcorrenciaScreen() {
 
           {audioUri ? (
             <View style={styles.audioInfoContainer}>
-              <Text style={styles.audioInfo}>Arquivo: {audioUri.split('/').pop()}</Text>
+              <Text style={styles.audioInfo}>Arquivo: {typeof audioUri === 'string' ? audioUri.split('/').pop() : 'gravação'}</Text>
             </View>
           ) : null}
         </Card>
@@ -351,10 +327,33 @@ export default function NovaOcorrenciaScreen() {
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Rota</Text>
                 <TouchableOpacity style={styles.selectBox} onPress={() => setRoutePickerOpen(true)}>
-                  <Text style={value ? styles.selectText : styles.selectPlaceholder}>
-                    {value ? `${rotas.find(r => r.id === value)?.nome}` : 'Selecione uma rota'}
-                  </Text>
+                  <View style={styles.selectContent}>
+                    <Text style={value ? styles.selectText : styles.selectPlaceholder}>
+                      {value ? `${rotas.find(r => r.id === value)?.nome}` : 'Selecione uma rota'}
+                    </Text>
+                    {value && rotas.find(r => r.id === value)?.isCurrent && (
+                      <View style={styles.currentBadgeSmall}>
+                        <Text style={styles.currentBadgeTextSmall}>Atual</Text>
+                      </View>
+                    )}
+                  </View>
                 </TouchableOpacity>
+                {!value && rotas.length > 0 && (
+                  <View style={styles.noRouteSelectedWarning}>
+                    <AlertCircle size={16} color="#F59E0B" />
+                    <Text style={styles.noRouteSelectedText}>
+                      Selecione uma rota para continuar
+                    </Text>
+                  </View>
+                )}
+                {!value && rotas.length === 0 && (
+                  <View style={styles.noRouteSelectedWarning}>
+                    <AlertCircle size={16} color="#F59E0B" />
+                    <Text style={styles.noRouteSelectedText}>
+                      Nenhuma rota disponível. Defina uma rota atual na tela de Rotas.
+                    </Text>
+                  </View>
+                )}
                 {errors.rotaId && <Text style={styles.errorText}>{errors.rotaId.message}</Text>}
               </View>
             )}
@@ -407,16 +406,29 @@ export default function NovaOcorrenciaScreen() {
                 rotas.map((rota) => (
                   <TouchableOpacity
                     key={rota.id}
-                    style={styles.optionRow}
+                    style={[
+                      styles.optionRow,
+                      rota.isCurrent && styles.optionRowCurrent
+                    ]}
                     onPress={() => {
                       setValue('rotaId', rota.id);
                       setRoutePickerOpen(false);
                     }}
                   >
                     <View style={styles.optionContent}>
-                      <Text style={styles.optionText}>
-                        {rota.nome}
-                      </Text>
+                      <View style={styles.optionTextContainer}>
+                        <Text style={[
+                          styles.optionText,
+                          rota.isCurrent && styles.optionTextCurrent
+                        ]}>
+                          {rota.nome}
+                        </Text>
+                        {rota.isCurrent && (
+                          <View style={styles.currentBadge}>
+                            <Text style={styles.currentBadgeText}>Atual</Text>
+                          </View>
+                        )}
+                      </View>
                       <View style={styles.optionDetails}>
                         <Text style={styles.optionStatus}>
                           Status: {rota.status === 'em_andamento' ? 'Em Andamento' : 'Concluída'}
@@ -449,30 +461,75 @@ export default function NovaOcorrenciaScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  hero: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomRightRadius: 28 },
+  hero: { 
+    paddingHorizontal: 20, 
+    paddingTop: 8, 
+    paddingBottom: 16, 
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24
+  },
   heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  backBtn: { padding: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.15)' },
+  backBtn: { 
+    padding: 7, 
+    borderRadius: 10, 
+    backgroundColor: 'rgba(255,255,255,0.15)' 
+  },
   heroTitle: { color: 'white', fontSize: 20, fontWeight: '700' },
-  heroSubtitle: { color: 'rgba(255,255,255,0.9)' },
+  heroSubtitle: { color: 'rgba(255,255,255,0.9)', fontSize: 12 },
 
-  content: { flex: 1, padding: 16, paddingBottom: 96 },
-  formSection: { marginTop: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 12 },
+  content: { flex: 1, padding: 20, paddingBottom: 100 },
+  formSection: { 
+    marginTop: 16, 
+    backgroundColor: '#F5F9FF',
+    borderRadius: 8,
+    borderWidth: 0,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0
+  },
+  sectionTitle: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: '#333333', 
+    marginBottom: 12,
+    letterSpacing: -0.3,
+    textTransform: 'uppercase'
+  },
 
   inputContainer: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 8 },
-  selectBox: { borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, backgroundColor: 'white', paddingVertical: 12, paddingHorizontal: 12 },
-  selectText: { color: '#111827', fontSize: 16 },
-  selectPlaceholder: { color: '#9CA3AF', fontSize: 16 },
+  label: { fontSize: 13, fontWeight: '500', color: '#374151', marginBottom: 6 },
+  selectBox: { 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0', 
+    borderRadius: 8, 
+    backgroundColor: 'white', 
+    paddingVertical: 10, 
+    paddingHorizontal: 12 
+  },
+  selectText: { color: '#333333', fontSize: 14 },
+  selectPlaceholder: { color: '#94A3B8', fontSize: 14 },
   textArea: { height: 100, textAlignVertical: 'top' },
-  errorText: { fontSize: 12, color: '#DC2626', marginTop: 4 },
+  errorText: { fontSize: 11, color: '#DC2626', marginTop: 4 },
 
-  audioRow: { flexDirection: 'row', gap: 12 },
-  audioBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#1E40AF', backgroundColor: '#EEF2FF' },
-  audioBtnActive: { backgroundColor: '#1E40AF', borderColor: '#1E40AF' },
-  audioBtnDisabled: { backgroundColor: '#E5E7EB', borderColor: '#D1D5DB', opacity: 0.7 },
-  audioText: { color: '#1E40AF', fontWeight: '700' },
-  audioInfo: { marginTop: 8, color: '#6B7280' },
+  audioRow: { flexDirection: 'row', gap: 10 },
+  audioBtn: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 8, 
+    paddingVertical: 10, 
+    borderRadius: 8, 
+    borderWidth: 1, 
+    borderColor: '#2563EB', 
+    backgroundColor: 'rgba(37,99,235,0.06)' 
+  },
+  audioBtnActive: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
+  audioBtnDisabled: { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0', opacity: 0.7 },
+  audioText: { color: '#2563EB', fontWeight: '600', fontSize: 13 },
+  audioInfo: { marginTop: 8, color: '#64748B', fontSize: 12 },
   audioInfoContainer: {
     marginTop: 8,
   },
@@ -483,16 +540,16 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'white',
-    paddingTop: 10,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB'
+    borderTopColor: '#F1F5F9'
   },
 
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: 'white', padding: 16, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
-  sheetTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 8 },
-  optionRow: { paddingVertical: 12 },
-  optionText: { fontSize: 16, color: '#111827' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  sheetTitle: { fontSize: 16, fontWeight: '600', color: '#333333', marginBottom: 12, textAlign: 'center' },
+  optionRow: { paddingVertical: 10, paddingHorizontal: 4 },
+  optionText: { fontSize: 14, color: '#333333' },
   optionContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -503,41 +560,43 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   optionStatus: {
-    fontSize: 12,
-    color: '#4B5563',
+    fontSize: 11,
+    color: '#64748B',
     marginBottom: 2,
   },
   optionDate: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    color: '#94A3B8',
   },
   noRotasContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 24,
   },
   noRotasText: {
-    fontSize: 16,
-    color: '#4B5563',
+    fontSize: 14,
+    color: '#64748B',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   noRotasSubtext: {
-    fontSize: 14,
-    color: '#9CA3AF',
+    fontSize: 12,
+    color: '#94A3B8',
     textAlign: 'center',
   },
 
   permissionContainer: {
     alignItems: 'center',
     marginBottom: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: '#F3F4F6',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#F8FAFC',
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   permissionText: {
-    fontSize: 14,
-    color: '#4B5563',
+    fontSize: 13,
+    color: '#64748B',
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -545,15 +604,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#EEF2FF',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(37,99,235,0.06)',
     borderRadius: 8,
   },
   permissionButtonText: {
-    color: '#1E40AF',
-    fontSize: 14,
+    color: '#2563EB',
+    fontSize: 13,
     fontWeight: '600',
   },
 
@@ -563,27 +622,81 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   processingModal: {
     backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 16,
     alignItems: 'center',
-    width: '80%',
+    width: '80%'
   },
   processingTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 10,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333333',
+    marginTop: 12,
   },
   processingSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 13,
+    color: '#64748B',
     marginTop: 4,
+    textAlign: 'center',
+  },
+  noRouteSelectedWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingHorizontal: 4,
+  },
+  noRouteSelectedText: {
+    fontSize: 11,
+    color: '#F59E0B',
+    marginLeft: 6,
+  },
+  optionRowCurrent: {
+    backgroundColor: 'rgba(37,99,235,0.08)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+  },
+  optionTextContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  optionTextCurrent: {
+    color: '#2563EB',
+    fontWeight: '600',
+  },
+  currentBadge: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  currentBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  selectContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  currentBadgeSmall: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  currentBadgeTextSmall: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
   },
 });

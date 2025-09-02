@@ -19,52 +19,48 @@ export default function RootLayout() {
     checkAuth();
   }, []);
 
-  useEffect(() => {
-    // Removendo a chamada para SystemUI.setBackgroundColorAsync que estava causando a tela azul
-  }, []);
+  useEffect(() => { }, []);
 
   const checkAuth = async () => {
     try {
       setAuth({ isLoading: true });
-      
+
       const storedAuth = await authService.getStoredAuth();
-      
+
       if (storedAuth && storedAuth.token) {
         const isValid = await authService.validateToken(storedAuth.token);
-        
+
         if (isValid) {
-          setAuth({ 
-            user: storedAuth.user, 
-            token: storedAuth.token, 
-            isAuthenticated: true, 
-            isLoading: false 
+          setAuth({
+            user: storedAuth.user,
+            token: storedAuth.token,
+            isAuthenticated: true,
+            isLoading: false
           });
         } else {
           await authService.logout();
-          setAuth({ 
-            user: null, 
-            token: null, 
-            isAuthenticated: false, 
-            isLoading: false 
+          setAuth({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            isLoading: false
           });
         }
       } else {
-        setAuth({ 
-          user: null, 
-          token: null, 
-          isAuthenticated: false, 
-          isLoading: false 
+        setAuth({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isLoading: false
         });
       }
     } catch (error) {
-      console.error('Erro ao verificar autenticação:', error);
       handleError(error, 'Erro ao verificar autenticação', true);
       setAuth({ isLoading: false, isAuthenticated: false });
     }
   };
 
   const handleGlobalError = (error: Error) => {
-    console.error('Global error caught:', error);
     handleError(error);
   };
 
@@ -75,14 +71,14 @@ export default function RootLayout() {
   if (!auth.isAuthenticated) {
     return (
       <ErrorBoundary onError={handleGlobalError}>
-        <View style={{ 
-          position: 'absolute', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          height: insets.top, 
-          backgroundColor: '#1E40AF', 
-          zIndex: 1 
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: insets.top,
+          backgroundColor: '#1E40AF',
+          zIndex: 1
         }} />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="onboard" />
@@ -98,14 +94,14 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary onError={handleGlobalError}>
-      <View style={{ 
-        position: 'absolute', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
-        height: insets.top, 
-        backgroundColor: '#1E40AF', 
-        zIndex: 1 
+      <View style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: insets.top,
+        backgroundColor: '#1E40AF',
+        zIndex: 1
       }} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="splash" />

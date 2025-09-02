@@ -18,6 +18,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useAppStore } from '@/src/store/useAppStore';
 
 interface RotaSimples {
   id: string;
@@ -25,6 +26,7 @@ interface RotaSimples {
   dataInicio: string;
   dataFim: string;
   status: string;
+  isCurrent?: boolean;
 }
 
 const despesaSchema = z.object({
@@ -49,6 +51,7 @@ export default function NovaDespesaScreen() {
   const [manualMode, setManualMode] = useState(false);
   const [canEditCategory, setCanEditCategory] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const { currentRoute } = useAppStore();
   const cameraRef = useRef<CameraView | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [routePickerOpen, setRoutePickerOpen] = useState(false);
@@ -97,15 +100,20 @@ export default function NovaDespesaScreen() {
     try {
       const response = await RotasApi.getRotasSimples();
       if (response.success) {
-        const rotas = response.data || [];
+        const rotas = (response.data || []) as RotaSimples[];
         
-        const activeRotas = rotas.filter((rota: any) => 
-          rota.status === 'em_andamento' || rota.status === 'concluida'
+        const activeRotas = rotas.filter((rota) => 
+          rota.status === 'em_andamento' || rota.status === 'concluida' || rota.status === 'ativa' || rota.status === 'passada'
         );
         
         setRotas(activeRotas);
         
-        if (activeRotas.length > 0) {
+        const rotaAtual = activeRotas.find(rota => rota.isCurrent === true);
+        
+        if (rotaAtual) {
+          setValue('rotaId', rotaAtual.id);
+        } 
+        else if (activeRotas.length > 0) {
           setValue('rotaId', activeRotas[0].id);
         }
       }
@@ -144,7 +152,6 @@ export default function NovaDespesaScreen() {
         await processOCR(photo.uri);
       }
     } catch (e) {
-      console.error(e);
       Alert.alert('Erro', 'Não foi possível capturar a foto.');
     }
   };
@@ -255,7 +262,6 @@ export default function NovaDespesaScreen() {
         if (tipo) setValue('categoria', mapTipoToCategoria(String(tipo)));
       }
     } catch (error) {
-      console.error('Erro no OCR:', error);
     } finally {
       setOcrLoading(false);
     }
@@ -287,7 +293,6 @@ export default function NovaDespesaScreen() {
       Toast.show({ type: 'success', text1: 'Despesa salva', text2: 'Registro concluído com sucesso.' });
       setTimeout(() => router.back(), 900);
     } catch (error) {
-      console.error('❌ NovaDespesa.onSubmit error:', error);
       Alert.alert('Erro', 'Não foi possível salvar a despesa');
     } finally {
       setLoading(false);
@@ -341,7 +346,7 @@ export default function NovaDespesaScreen() {
       {ocrLoading && (
         <View style={styles.processingOverlay}>
           <View style={styles.processingSpinner}>
-            <ActivityIndicator size="large" color="#1E40AF" />
+            <ActivityIndicator size="large" color="#2563EB" />
           </View>
         </View>
       )}
@@ -371,7 +376,7 @@ export default function NovaDespesaScreen() {
               onPress={openCamera}
               disabled={manualMode}
             >
-              <Camera size={20} color={manualMode ? '#9CA3AF' : '#1E40AF'} />
+              <Camera size={20} color={manualMode ? '#94A3B8' : '#2563EB'} />
               <Text style={[styles.actionText, manualMode && styles.actionTextDisabled]}>Fotografar</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -379,13 +384,13 @@ export default function NovaDespesaScreen() {
               onPress={pickFromGallery}
               disabled={manualMode}
             >
-              <Upload size={20} color={manualMode ? '#9CA3AF' : '#1E40AF'} />
+              <Upload size={20} color={manualMode ? '#94A3B8' : '#2563EB'} />
               <Text style={[styles.actionText, manualMode && styles.actionTextDisabled]}>Anexar</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.manualRow} onPress={() => setManualMode((v) => !v)}>
-            {manualMode ? <CheckSquare size={18} color="#1E40AF" /> : <Square size={18} color="#6B7280" />}
-            <Text style={[styles.manualText, manualMode && { color: '#1E40AF', fontWeight: '700' }]}>Não tenho acesso ao comprovante (preencher manualmente)</Text>
+            {manualMode ? <CheckSquare size={18} color="#2563EB" /> : <Square size={18} color="#64748B" />}
+            <Text style={[styles.manualText, manualMode && { color: '#2563EB', fontWeight: '600' }]}>Não tenho acesso ao comprovante (preencher manualmente)</Text>
           </TouchableOpacity>
 
           {imageUri ? (
@@ -411,9 +416,16 @@ export default function NovaDespesaScreen() {
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Rota</Text>
                 <TouchableOpacity style={styles.selectBox} onPress={() => setRoutePickerOpen(true)}>
-                  <Text style={value ? styles.selectText : styles.selectPlaceholder}>
-                    {value ? `${rotas.find(r => r.id === value)?.nome}` : 'Selecione uma rota'}
-                  </Text>
+                  <View style={styles.selectContent}>
+                    <Text style={value ? styles.selectText : styles.selectPlaceholder}>
+                      {value ? `${rotas.find(r => r.id === value)?.nome}` : 'Selecione uma rota'}
+                    </Text>
+                    {value && rotas.find(r => r.id === value)?.isCurrent && (
+                      <View style={styles.currentBadgeSmall}>
+                        <Text style={styles.currentBadgeTextSmall}>Atual</Text>
+                      </View>
+                    )}
+                  </View>
                 </TouchableOpacity>
                 {errors.rotaId && (
                   <Text style={styles.errorText}>{errors.rotaId.message}</Text>
@@ -454,8 +466,8 @@ export default function NovaDespesaScreen() {
                   editable={canEditCategory}
                 />
                 <TouchableOpacity style={styles.manualRow} onPress={() => setCanEditCategory((v) => !v)}>
-                  {canEditCategory ? <CheckSquare size={18} color="#1E40AF" /> : <Square size={18} color="#6B7280" />}
-                  <Text style={[styles.manualText, canEditCategory && { color: '#1E40AF', fontWeight: '700' }]}>Alterar categoria</Text>
+                  {canEditCategory ? <CheckSquare size={18} color="#2563EB" /> : <Square size={18} color="#64748B" />}
+                  <Text style={[styles.manualText, canEditCategory && { color: '#2563EB', fontWeight: '600' }]}>Alterar categoria</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -554,10 +566,35 @@ export default function NovaDespesaScreen() {
             <Text style={styles.sheetTitle}>Selecione a rota</Text>
             <ScrollView style={{ maxHeight: 360 }}>
               {rotas.map((rota) => {
-                const label = `${rota.nome}`;
                 return (
-                  <TouchableOpacity key={rota.id} style={styles.optionRow} onPress={() => { setValue('rotaId', rota.id); setRoutePickerOpen(false); }}>
-                    <Text style={styles.optionText}>{label}</Text>
+                  <TouchableOpacity 
+                    key={rota.id} 
+                    style={[
+                      styles.optionRow,
+                      rota.isCurrent && styles.optionRowCurrent
+                    ]} 
+                    onPress={() => { setValue('rotaId', rota.id); setRoutePickerOpen(false); }}
+                  >
+                    <View style={styles.optionContent}>
+                      <View style={styles.optionTextContainer}>
+                        <Text style={[
+                          styles.optionText,
+                          rota.isCurrent && styles.optionTextCurrent
+                        ]}>
+                          {rota.nome}
+                        </Text>
+                        {rota.isCurrent && (
+                          <View style={styles.currentBadge}>
+                            <Text style={styles.currentBadgeText}>Atual</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.optionDetails}>
+                        <Text style={styles.optionStatus}>
+                          Status: {rota.status === 'em_andamento' || rota.status === 'ativa' ? 'Em Andamento' : 'Concluída'}
+                        </Text>
+                      </View>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -587,16 +624,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     padding: 16,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  hero: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomRightRadius: 28 },
+  hero: { 
+    paddingHorizontal: 20, 
+    paddingTop: 8, 
+    paddingBottom: 16, 
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24
+  },
   heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroTitle: { color: 'white', fontSize: 20, fontWeight: '700' },
-  heroSubtitle: { color: 'rgba(255,255,255,0.9)' },
+  heroSubtitle: { color: 'rgba(255,255,255,0.9)', fontSize: 12 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -608,7 +646,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
   },
   backButton: {
-    padding: 8,
+    padding: 7,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)'
   },
   title: {
     fontSize: 18,
@@ -620,17 +660,25 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: 20,
   },
   formCard: {
-    marginBottom: 20,
+    marginBottom: 16,
+    backgroundColor: '#F5F9FF',
+    borderRadius: 8,
+    borderWidth: 0,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0
   },
   inputRow: { flexDirection: 'row', gap: 12 },
   inputRowStack: { flexDirection: 'column' },
   halfInput: { flex: 1 },
   actionsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     marginBottom: 12,
   },
   actionBtn: {
@@ -639,37 +687,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#1E40AF',
-    backgroundColor: '#EEF2FF',
+    borderColor: '#2563EB',
+    backgroundColor: 'rgba(37,99,235,0.06)',
   },
-  actionBtnDisabled: { borderColor: '#E5E7EB', backgroundColor: '#F3F4F6' },
-  actionText: { color: '#1E40AF', fontWeight: '700' },
-  actionTextDisabled: { color: '#9CA3AF', fontWeight: '600' },
-  manualRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  manualText: { color: '#6B7280', fontSize: 13 },
+  actionBtnDisabled: { borderColor: '#E2E8F0', backgroundColor: '#F1F5F9' },
+  actionText: { color: '#2563EB', fontWeight: '600', fontSize: 13 },
+  actionTextDisabled: { color: '#94A3B8', fontWeight: '500', fontSize: 13 },
+  manualRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  manualText: { color: '#64748B', fontSize: 12 },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
+    color: '#333333',
+    marginBottom: 12,
+    letterSpacing: -0.3,
+    textTransform: 'uppercase'
   },
   inputContainer: {
     marginBottom: 16,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: '#374151',
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  selectBox: { borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, backgroundColor: 'white', paddingVertical: 12, paddingHorizontal: 12 },
-  selectText: { color: '#111827', fontSize: 16 },
-  selectPlaceholder: { color: '#9CA3AF', fontSize: 16 },
+  selectBox: { 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0', 
+    borderRadius: 8, 
+    backgroundColor: 'white', 
+    paddingVertical: 10, 
+    paddingHorizontal: 12 
+  },
+  selectContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectText: { color: '#333333', fontSize: 14 },
+  selectPlaceholder: { color: '#94A3B8', fontSize: 14 },
   errorText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#DC2626',
     marginTop: 4,
   },
@@ -693,16 +751,77 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  fixedFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'white', paddingHorizontal: 16, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
+  fixedFooter: { 
+    position: 'absolute', 
+    left: 0, 
+    right: 0, 
+    bottom: 0, 
+    backgroundColor: 'white', 
+    paddingHorizontal: 20, 
+    paddingTop: 12, 
+    borderTopWidth: 1, 
+    borderTopColor: '#F1F5F9' 
+  },
   cameraContainer: { flex: 1, backgroundColor: '#000' },
   camera: { flex: 1 },
   cameraOverlay: { flex: 1, justifyContent: 'space-between' },
   cameraClose: { alignSelf: 'flex-end', margin: 16, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 999, padding: 8 },
   cameraActions: { alignItems: 'center', marginBottom: 24 },
   shutterButton: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#fff', borderWidth: 4, borderColor: 'rgba(255,255,255,0.6)' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: 'white', padding: 16, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
-  sheetTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 8 },
-  optionRow: { paddingVertical: 12 },
-  optionText: { fontSize: 16, color: '#111827' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  sheetTitle: { fontSize: 16, fontWeight: '600', color: '#333333', marginBottom: 12, textAlign: 'center' },
+  optionRow: { paddingVertical: 10, paddingHorizontal: 4 },
+  optionText: { fontSize: 14, color: '#333333' },
+  optionRowCurrent: {
+    backgroundColor: 'rgba(37,99,235,0.08)',
+    borderRadius: 8,
+    padding: 8,
+  },
+  optionTextContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  optionTextCurrent: {
+    color: '#2563EB',
+    fontWeight: '600',
+  },
+  currentBadge: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  currentBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  currentBadgeSmall: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  currentBadgeTextSmall: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  optionContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  optionDetails: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+  },
+  optionStatus: {
+    fontSize: 11,
+    color: '#64748B',
+  },
 });

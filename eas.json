@@ -1,33 +1,45 @@
 {
-    "cli": {
-      "version": ">= 12.0.0"
-    },
-    "build": {
-      "development": {
-        "developmentClient": true,
-        "distribution": "internal",
-        "ios": {
-          "resourceClass": "m-medium"
-        }
-      },
-      "preview": {
-        "distribution": "internal",
-        "ios": {
-          "resourceClass": "m-medium"
-        }
-      },
-      "production": {
-        "ios": {
-          "resourceClass": "m-medium"
-        }
-      },
-      "apk": {
-        "android": {
-          "buildType": "apk"
-        }
+  "cli": {
+    "version": ">= 12.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m-medium"
       }
     },
-    "submit": {
-      "production": {}
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    },
+    "production": {
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    },
+    "apk": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://tripapi.traceai.com.br"
+      }
+    },
+    "direct-apk": {
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://tripapi.traceai.com.br"
+      }
     }
+  },
+  "submit": {
+    "production": {}
   }
+}

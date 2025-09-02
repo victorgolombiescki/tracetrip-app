@@ -12,7 +12,7 @@ export class ApiClient {
   private baseURL: string;
   private token: string | null = null;
 
-  constructor(baseURL: string = (typeof process !== 'undefined' && (process as any).env?.EXPO_PUBLIC_API_BASE_URL)) {
+  constructor(baseURL: string = (typeof process !== 'undefined' && (process as any).env?.EXPO_PUBLIC_API_BASE_URL) || 'https://tripapi.traceai.com.br') {
     this.baseURL = baseURL;
   }
 
@@ -27,7 +27,7 @@ export class ApiClient {
         text1: title,
         text2: description,
       });
-    } catch {}
+    } catch { }
   }
 
   private mapFriendlyError(status?: number, rawMessage?: string): { title: string; description: string } {
@@ -50,7 +50,7 @@ export class ApiClient {
 
   private async http<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: any, extraHeaders?: Record<string, string>): Promise<ApiResponse<T>> {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined as any;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 15000) : undefined; 
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 15000) : undefined;
 
     try {
       const headers: Record<string, string> = {
@@ -70,9 +70,7 @@ export class ApiClient {
       let json: any = undefined;
       try {
         json = text ? JSON.parse(text) : undefined;
-      } catch {
-        // body não-JSON (ex: HTML de proxy 502), mantém json como undefined
-      }
+      } catch {}
 
       if (!res.ok) {
         const friendly = this.mapFriendlyError(res.status, json?.message || res.statusText);
@@ -247,7 +245,7 @@ export class ApiClient {
 
   async createDespesaInteligente(formData: FormData): Promise<ApiResponse<any>> {
     try {
-      
+
       const headers: Record<string, string> = {
         'Accept': 'application/json',
         'Content-Type': 'multipart/form-data'
@@ -316,9 +314,9 @@ export class ApiClient {
 
   async transcribeAudio(fileUri: string): Promise<ApiResponse<{ text: string }>> {
     try {
-      
+
       const form = new FormData();
-      
+
       if (Platform.OS === 'web') {
         const resp = await fetch(fileUri);
         const blob = await resp.blob();
@@ -370,6 +368,18 @@ export class ApiClient {
 
   async createDespesaComViagem(viagemId: number, despesa: any): Promise<ApiResponse<any>> {
     return this.http('POST', '/app/despesas', { viagemId, despesa });
+  }
+
+  async finalizarViagem(id: string): Promise<ApiResponse<any>> {
+    return this.http('POST', `/app/rotas/${id}/finalizar`, {});
+  }
+  
+  async setCurrentRoute(id: string): Promise<ApiResponse<any>> {
+    return this.http('POST', `/app/rotas/${id}/set-current`, {});
+  }
+  
+  async getCurrentRoute(): Promise<ApiResponse<any>> {
+    return this.http('GET', `/app/rotas/current`);
   }
 }
 

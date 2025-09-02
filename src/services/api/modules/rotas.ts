@@ -9,4 +9,7 @@ export const RotasApi = {
     limit: number = 10
   ) => apiClient.getRotasPaginado(filtros, page, limit),
   getById: async (id: string) => apiClient.getRotaById(id),
+  finalizarViagem: async (id: string) => apiClient.finalizarViagem(id),
+  setCurrentRoute: async (id: string) => apiClient.setCurrentRoute(id),
+  getCurrentRoute: async () => apiClient.getCurrentRoute(),
 }; 

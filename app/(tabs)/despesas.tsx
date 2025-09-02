@@ -170,12 +170,26 @@ export default function DespesasScreen() {
   const formatDateLine = (isoDate: string, hora?: string) => {
     try {
       const d = new Date(isoDate);
+      d.setHours(d.getHours() - 3);
+      
       const dataFormatada = d.toLocaleDateString('pt-BR', {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
       });
-      return hora ? `${d.getDate()} ${dataFormatada.split(' ').slice(1).join(' ')}, ${hora}` : dataFormatada;
+      
+      let horaAjustada = hora;
+      if (hora) {
+        const [h, m] = hora.split(':').map(Number);
+        if (!isNaN(h) && !isNaN(m)) {
+          const horaObj = new Date();
+          horaObj.setHours(h, m);
+          horaObj.setHours(horaObj.getHours() - 3);
+          horaAjustada = `${String(horaObj.getHours()).padStart(2, '0')}:${String(horaObj.getMinutes()).padStart(2, '0')}`;
+        }
+      }
+      
+      return horaAjustada ? `${d.getDate()} ${dataFormatada.split(' ').slice(1).join(' ')}, ${horaAjustada}` : dataFormatada;
     } catch (e) {
       return isoDate;
     }
@@ -376,25 +390,25 @@ export default function DespesasScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFF',
+    backgroundColor: '#FFFFFF',
   },
-  hero: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomRightRadius: 28 },
+  hero: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  heroTitleContainer: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  heroTitleContainer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 },
   heroIconContainer: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 12, 
+    width: 36, 
+    height: 36, 
+    borderRadius: 10, 
     backgroundColor: 'rgba(255,255,255,0.2)', 
     justifyContent: 'center', 
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 3,
   },
   heroTitle: { color: 'white', fontSize: 22, fontWeight: '700' },
-  heroSubtitle: { color: 'rgba(255,255,255,0.9)' },
+  heroSubtitle: { color: 'rgba(255,255,255,0.9)', fontSize: 14 },
   header: {
     padding: 20,
     backgroundColor: 'white',
@@ -412,55 +426,50 @@ const styles = StyleSheet.create({
   filters: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
+    gap: 10,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   filterButton: {
     paddingVertical: 8,
     paddingHorizontal: 14,
-    borderRadius: 999,
+    borderRadius: 20,
+    backgroundColor: 'rgba(37,99,235,0.06)',
     borderWidth: 1,
-    borderColor: '#1E40AF',
-    backgroundColor: 'transparent',
+    borderColor: 'transparent',
   },
   filterButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   filterButtonActive: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#1E40AF',
+    backgroundColor: 'white',
+    borderColor: '#2563EB',
   },
   filterText: {
     textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E40AF',
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#64748B',
   },
   filterTextActive: {
-    color: '#1E40AF',
-    fontWeight: '700',
+    color: '#2563EB',
+    fontWeight: '600',
   },
   listContainer: {
-    padding: 16,
-    gap: 12,
+    padding: 20,
+    gap: 1,
   },
   despesaCard: {
-    borderRadius: 16,
-    padding: 12,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: '#F5F9FF',
+    marginBottom: 4,
+    borderWidth: 0,
   },
   despesaHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   despesaInfo: {
     flex: 1,
@@ -471,86 +480,89 @@ const styles = StyleSheet.create({
   },
   despesaInfoText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 10,
   },
   iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(37,99,235,0.1)',
   },
   despesaTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 2,
   },
   categoria: {
-    fontSize: 13,
-    color: '#6B7280',
+    fontSize: 11,
+    color: '#666666',
+    fontWeight: '400',
   },
   despesaStatus: {
     alignItems: 'flex-end',
   },
   valor: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#EF4444',
-    marginBottom: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563EB',
+    marginBottom: 4,
+    textAlign: 'right',
   },
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '600',
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
   },
   despesaDetails: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   data: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    color: '#666666',
   },
   hora: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    color: '#666666',
   },
   rotaText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
+    fontSize: 11,
+    color: '#666666',
+    marginTop: 2,
   },
   dataLine: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    color: '#666666',
     marginTop: 2,
   },
   rotaLine: {
-    fontSize: 13,
-    color: '#374151',
+    fontSize: 11,
+    color: '#666666',
     marginTop: 2,
   },
   attachmentButton: {
-    padding: 4,
+    padding: 2,
   },
   loadingContainer: {
     flex: 1,
@@ -558,35 +570,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 14,
+    color: '#666666',
   },
   loadingMoreContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 16,
   },
   loadingMoreText: {
-    marginLeft: 10,
-    fontSize: 14,
-    color: '#6B7280',
+    marginLeft: 8,
+    fontSize: 12,
+    color: '#666666',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
+    paddingVertical: 20,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
+    color: '#333333',
+    marginBottom: 6,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 11,
+    color: '#666666',
     textAlign: 'center',
   },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center' },

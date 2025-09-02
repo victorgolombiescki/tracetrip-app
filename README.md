@@ -57,6 +57,8 @@ npx expo run:android
 npx expo run:ios
 ```
 
+
+
 ## 🏗 Arquitetura
 
 ### Estrutura de Pastas
@@ -254,3 +256,7 @@ npm test
 **Versão**: 1.0.0  
 **Licença**: Proprietary  
 **Desenvolvido com**: Expo + React Native + TypeScript
+
+
+Build da imagem
+npx eas-cli build -p android --profile apk

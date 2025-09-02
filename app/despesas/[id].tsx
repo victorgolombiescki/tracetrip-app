@@ -49,13 +49,13 @@ export default function DespesaDetailScreen() {
   const getStatusTheme = (status?: string) => {
     switch (status) {
       case 'PENDENTE':
-        return { bg: '#FEF3C7', dot: '#F59E0B', text: '#B45309', label: 'Pendente' };
+        return { bg: 'rgba(245,158,11,0.1)', dot: '#F59E0B', text: '#B45309', label: 'Pendente' };
       case 'APROVADO':
-        return { bg: '#ECFDF5', dot: '#10B981', text: '#065F46', label: 'Aprovado' };
+        return { bg: 'rgba(16,185,129,0.1)', dot: '#10B981', text: '#065F46', label: 'Aprovado' };
       case 'REPROVADO':
-        return { bg: '#FEF2F2', dot: '#EF4444', text: '#991B1B', label: 'Reprovado' };
+        return { bg: 'rgba(239,68,68,0.1)', dot: '#EF4444', text: '#991B1B', label: 'Reprovado' };
       default:
-        return { bg: '#F3F4F6', dot: '#6B7280', text: '#374151', label: status || '-' };
+        return { bg: 'rgba(107,114,128,0.1)', dot: '#6B7280', text: '#374151', label: status || '-' };
     }
   };
 
@@ -77,7 +77,7 @@ export default function DespesaDetailScreen() {
   }
 
   const TipoIcon = getTipoIcon(detalhe.tipo);
-  const tipoColor = getTipoColor(detalhe.tipo);
+  const tipoColor = '#2563EB'; 
   const statusTheme = getStatusTheme(detalhe.status);
 
   return (
@@ -99,7 +99,20 @@ export default function DespesaDetailScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.nome}>{detalhe.nome}</Text>
               <Text style={styles.subInfo} numberOfLines={1} ellipsizeMode="tail">
-                {new Date(detalhe.data).toLocaleDateString('pt-BR')} • {detalhe.hora} • {detalhe.tipo}
+                {(() => {
+                  const date = new Date(detalhe.data);
+                  date.setTime(date.getTime() - (3 * 60 * 60 * 1000));
+                  return date.toLocaleDateString('pt-BR');
+                })()} • {(() => {
+                  if (!detalhe.hora) return '-';
+                  const [h, m] = detalhe.hora.split(':').map(Number);
+                  if (isNaN(h) || isNaN(m)) return detalhe.hora;
+                  
+                  const horaObj = new Date();
+                  horaObj.setHours(h, m);
+                  horaObj.setHours(horaObj.getHours() - 3);
+                  return `${String(horaObj.getHours()).padStart(2, '0')}:${String(horaObj.getMinutes()).padStart(2, '0')}`;
+                })()} • {detalhe.tipo}
               </Text>
               {detalhe.rota && (
                 <Text style={styles.subInfo} numberOfLines={1} ellipsizeMode="tail">Rota: {detalhe.rota}</Text>
@@ -120,8 +133,21 @@ export default function DespesaDetailScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Informações</Text>
-          <InfoRow label="Data" value={new Date(detalhe.data).toLocaleDateString('pt-BR')} />
-          <InfoRow label="Hora" value={detalhe.hora} />
+          <InfoRow label="Data" value={(() => {
+            const date = new Date(detalhe.data);
+            date.setTime(date.getTime() - (3 * 60 * 60 * 1000));
+            return date.toLocaleDateString('pt-BR');
+          })()} />
+          <InfoRow label="Hora" value={(() => {
+            if (!detalhe.hora) return '-';
+            const [h, m] = detalhe.hora.split(':').map(Number);
+            if (isNaN(h) || isNaN(m)) return detalhe.hora;
+            
+            const horaObj = new Date();
+            horaObj.setHours(h, m);
+            horaObj.setHours(horaObj.getHours() - 3);
+            return `${String(horaObj.getHours()).padStart(2, '0')}:${String(horaObj.getMinutes()).padStart(2, '0')}`;
+          })()} />
           <InfoRow label="Tipo" value={detalhe.tipo} />
           <InfoRow label="Reembolso" value={detalhe.teveReembolso ? 'Sim' : 'Não'} />
         </View>
@@ -214,60 +240,78 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F6F7FB' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
   topbar: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     backgroundColor: 'white',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
-  topbarTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  topbarTitle: { fontSize: 16, fontWeight: '600', color: '#333333' },
   backButton: { padding: 6 },
-  hero: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 18 },
-  heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  hero: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, marginTop: 10 },
   heroTitle: { color: 'white', fontSize: 18, fontWeight: '700' },
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  summaryLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 12 },
-  iconCircle: { width: 48, height: 48, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  nome: { color: 'white', fontSize: 18, fontWeight: '700' },
-  subInfo: { color: 'rgba(255,255,255,0.9)', fontSize: 12 },
+  summaryLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 10 },
+  iconCircle: { width: 28, height: 28, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' },
+  nome: { color: 'white', fontSize: 16, fontWeight: '600' },
+  subInfo: { color: 'rgba(255,255,255,0.9)', fontSize: 11 },
   summaryRight: { alignItems: 'flex-end' },
-  valorGrande: { color: 'white', fontSize: 22, fontWeight: '800' },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, marginTop: 6 },
-  statusText: { fontSize: 12, fontWeight: '700' },
-  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  valorGrande: { color: 'white', fontSize: 18, fontWeight: '700' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginTop: 4 },
+  statusText: { fontSize: 10, fontWeight: '600' },
+  statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 4 },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { color: '#6B7280' },
 
-  content: { padding: 16, gap: 16 },
+  content: { padding: 20, gap: 12 },
   card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-    gap: 8,
+    backgroundColor: '#F5F9FF',
+    borderRadius: 8,
+    padding: 12,
+    gap: 6,
+    marginBottom: 4,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  label: { fontSize: 14, color: '#6B7280' },
-  value: { fontSize: 16, fontWeight: '600', color: '#111827' },
+  sectionTitle: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: '#333333', 
+    marginBottom: 4,
+    letterSpacing: -0.3,
+    textTransform: 'uppercase',
+  },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
+  label: { fontSize: 12, color: '#666666' },
+  value: { fontSize: 12, fontWeight: '600', },
 
-  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE', borderWidth: 1, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999 },
-  chipText: { color: '#1E40AF', fontWeight: '600' },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { 
+    backgroundColor: 'rgba(37,99,235,0.06)', 
+    paddingVertical: 4, 
+    paddingHorizontal: 8, 
+    borderRadius: 20,
+    borderWidth: 0,
+  },
+  chipText: { color: '#2563EB', fontSize: 11, fontWeight: '500' },
 
-  preview: { borderRadius: 12, overflow: 'hidden', position: 'relative' },
-  previewImage: { width: '100%', height: 220 },
-  previewOverlay: { position: 'absolute', bottom: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  previewText: { color: 'white', fontWeight: '700' },
+  preview: { borderRadius: 8, overflow: 'hidden', position: 'relative' },
+  previewImage: { width: '100%', height: 160 },
+  previewOverlay: { 
+    position: 'absolute', 
+    bottom: 8, 
+    right: 8, 
+    backgroundColor: 'rgba(37,99,235,0.8)', 
+    borderRadius: 20, 
+    paddingHorizontal: 8, 
+    paddingVertical: 4, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4 
+  },
+  previewText: { color: 'white', fontWeight: '600', fontSize: 11 },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center' },
   modalImage: { width: '90%', height: '80%' },
