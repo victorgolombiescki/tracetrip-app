@@ -259,4 +259,4 @@ npm test
 
 
 Build da imagem
-npx eas-cli build -p android --profile apk
+npx eas-cli build -p android --profile apk# tracetrip-app
