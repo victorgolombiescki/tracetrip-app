@@ -37,6 +37,14 @@
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://tripapi.traceai.com.br"
       }
+    },
+    "aab": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://tripapi.traceai.com.br"
+      }
     }
   },
   "submit": {

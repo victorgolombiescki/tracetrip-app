@@ -146,6 +146,7 @@ export default function LoginScreen() {
                         onChangeText={onChange}
                         onBlur={onBlur}
                         placeholder="Digite seu e-mail"
+                        placeholderTextColor="#9CA3AF"
                         autoCapitalize="none"
                         autoCorrect={false}
                         keyboardType="email-address"
@@ -174,6 +175,7 @@ export default function LoginScreen() {
                         onChangeText={onChange}
                         onBlur={onBlur}
                         placeholder="Digite sua senha"
+                        placeholderTextColor="#9CA3AF"
                         secureTextEntry
                       />
                     </View>
@@ -215,6 +217,7 @@ export default function LoginScreen() {
                   value={resetEmail}
                   onChangeText={setResetEmail}
                   placeholder="seuemail@dominio.com"
+                  placeholderTextColor="#9CA3AF"
                   autoCapitalize="none"
                   keyboardType="email-address"
                 />
@@ -307,7 +310,13 @@ const styles = StyleSheet.create({
   inputLabel: { fontSize: 14, fontWeight: '500', color: '#4B5563', marginBottom: 4 },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingVertical: 12 },
   inputValid: { borderBottomColor: '#10B981' },
-  input: { flex: 1, fontSize: 16, color: '#111827' },
+  input: { 
+    flex: 1, 
+    fontSize: 16, 
+    color: '#111827',
+    minHeight: 20,
+    paddingVertical: 4,
+  },
   validIcon: { fontSize: 16, color: '#10B981', fontWeight: '700' },
   errorText: { fontSize: 14, color: '#EF4444' },
   optionsContainer: { flexDirection: 'column', alignItems: 'flex-start' },

@@ -10,10 +10,8 @@ import { Camera, Upload, X, ArrowLeft, CheckSquare, Square, RotateCcw } from 'lu
 import { Input } from '@/src/components/ui/Input';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
-import { OCRProviderFactory } from '@/src/services/ocr/OCRProvider';
 import { RotasApi } from '@/src/services/api/modules/rotas';
 import { DespesasApi } from '@/src/services/api/modules/despesas';
-import {  Rota } from '@/src/types';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
@@ -99,6 +97,7 @@ export default function NovaDespesaScreen() {
   const loadRotas = async () => {
     try {
       const response = await RotasApi.getRotasSimples();
+      console.log('response', response);
       if (response.success) {
         const rotas = (response.data || []) as RotaSimples[];
         
