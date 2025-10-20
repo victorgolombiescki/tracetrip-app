@@ -131,12 +131,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   dayItemSelected: {
-    backgroundColor: '#1E40AF',
+    backgroundColor: '#254985',
   },
   dayItemToday: {
     backgroundColor: '#E0E7FF',
     borderWidth: 1,
-    borderColor: '#1E40AF',
+    borderColor: '#254985',
   },
   dayItemMonthStart: {
     marginTop: 10,
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#1E40AF',
+    backgroundColor: '#254985',
     position: 'absolute',
     bottom: 8,
   },

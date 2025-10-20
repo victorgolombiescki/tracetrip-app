@@ -106,7 +106,7 @@ export default function AgendaDetailScreen() {
   if (!agenda) {
     return (
       <SafeAreaView style={styles.container}>
-        <LinearGradient colors={["#1E40AF", "#1E40AF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <View style={styles.heroRow}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
               <ArrowLeft size={22} color="#FFFFFF" />
@@ -128,7 +128,7 @@ export default function AgendaDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient colors={["#1E40AF", "#1E40AF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+      <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <View style={styles.heroRow}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <ArrowLeft size={22} color="#FFFFFF" />
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   badge: { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   badgeOk: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
   badgeWarn: { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' },
-  badgeText: { color: '#1E40AF', fontWeight: '700', fontSize: 12 },
+  badgeText: { color: '#254985', fontWeight: '700', fontSize: 12 },
   templateText: { fontSize: 14, color: '#374151', lineHeight: 20, marginTop: 8 },
   templateTextBold: { fontSize: 14, color: '#111827', fontWeight: '800' },
 }); 

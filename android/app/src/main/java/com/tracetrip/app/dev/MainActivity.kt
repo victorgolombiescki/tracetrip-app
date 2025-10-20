@@ -1,4 +1,4 @@
-package com.tracetrip.app
+package com.tracetrip.app.dev
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

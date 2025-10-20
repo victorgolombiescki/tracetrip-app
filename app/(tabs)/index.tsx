@@ -10,6 +10,8 @@ import { apiClient } from '@/src/services/api/ApiClient';
 import { RotasApi } from '@/src/services/api/modules/rotas';
 import ErrorBoundary from '@/src/components/ErrorBoundary';
 import { tryCatch } from '@/src/utils/errorHandler';
+import { TrackingButton } from '@/src/components/TrackingButton';
+import { trackingService } from '@/src/services/TrackingService';
 
 export default function HomeScreen() {
   const { auth, setCurrentRoute, currentRoute, setAuth } = useAppStore();
@@ -32,6 +34,9 @@ export default function HomeScreen() {
     React.useCallback(() => {
       loadDashboardData();
       loadCurrentRoute();
+      
+      trackingService.restoreTrackingIfEnabled();
+      
       return () => { };
     }, [])
   );
@@ -141,7 +146,7 @@ export default function HomeScreen() {
     <ErrorBoundary>
       <SafeAreaView style={styles.container}>
         <LinearGradient
-          colors={["#1E40AF", "#2563EB"]}
+          colors={["#254985", "#254985"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.hero}
@@ -157,7 +162,7 @@ export default function HomeScreen() {
               </View>
             </View>
             <View style={styles.heroActions}>
-        
+              <TrackingButton />
 
               <TouchableOpacity style={styles.notificationButton}>
                 <Bell size={20} color="white" />
@@ -1047,7 +1052,7 @@ const styles = StyleSheet.create({
   currentRouteTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1E40AF',
+    color: '#254985',
     marginBottom: 6,
   },
   currentRouteDetailsRow: {
@@ -1070,7 +1075,7 @@ const styles = StyleSheet.create({
   currentRouteStatusText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#1E40AF',
+    color: '#254985',
   },
   currentRouteArrow: {
     marginLeft: 8,
@@ -1099,7 +1104,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   setCurrentRouteButtonText: {
-    color: '#1E40AF',
+    color: '#254985',
     fontSize: 14,
     fontWeight: '600',
   },

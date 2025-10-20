@@ -270,7 +270,7 @@ export default function NovaOcorrenciaScreen() {
         </View>
       )}
 
-      <LinearGradient colors={["#1E40AF", "#1E40AF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+      <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <View style={styles.heroRow}>
           <TouchableOpacity onPress={handleClose} style={styles.backBtn}>
             <ArrowLeft size={22} color="#fff" />
