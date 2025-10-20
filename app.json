@@ -2,7 +2,7 @@
   "expo": {
     "name": "TraceTrip",
     "slug": "trace-trip",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icone_t.png",
     "splash": {
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.tracetrip.app",
-      "versionCode": 2,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icone_t.png",
         "backgroundColor": "#1E40AF"

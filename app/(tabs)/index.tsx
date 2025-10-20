@@ -12,6 +12,7 @@ import ErrorBoundary from '@/src/components/ErrorBoundary';
 import { tryCatch } from '@/src/utils/errorHandler';
 import { TrackingButton } from '@/src/components/TrackingButton';
 import { trackingService } from '@/src/services/TrackingService';
+import NetInfo from '@react-native-community/netinfo';
 
 export default function HomeScreen() {
   const { auth, setCurrentRoute, currentRoute, setAuth } = useAppStore();
@@ -28,6 +29,8 @@ export default function HomeScreen() {
     viagem?: string;
   } | null>(null);
   const [loadingCurrentRoute, setLoadingCurrentRoute] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [offlineStats, setOfflineStats] = useState<{ total: number; unsynced: number }>({ total: 0, unsynced: 0 });
   const { width } = useWindowDimensions();
 
   useFocusEffect(
@@ -37,7 +40,25 @@ export default function HomeScreen() {
       
       trackingService.restoreTrackingIfEnabled();
       
-      return () => { };
+      const unsubscribe = NetInfo.addEventListener(state => {
+        const online = (state.isConnected === true) && (state.isInternetReachable !== false);
+        setIsOnline(online);
+      });
+
+      let intervalId: any;
+      const loadStats = async () => {
+        try {
+          const stats = await trackingService.getOfflineStats();
+          setOfflineStats(stats);
+        } catch {}
+      };
+      loadStats();
+      intervalId = setInterval(loadStats, 15000);
+      
+      return () => { 
+        try { unsubscribe(); } catch {}
+        try { if (intervalId) clearInterval(intervalId); } catch {}
+      };
     }, [])
   );
 
@@ -182,6 +203,13 @@ export default function HomeScreen() {
             </View>
             
           </View>
+          {!isOnline && (
+            <View style={styles.offlineBanner}>
+              <Text style={styles.offlineBannerText}>
+                Sem conexão. Coleta de localização continua offline ({offlineStats.unsynced} pendente{offlineStats.unsynced === 1 ? '' : 's'}).
+              </Text>
+            </View>
+          )}
 
           {(currentRoute || dashboard?.viagem) && (
             <TouchableOpacity
@@ -234,6 +262,19 @@ export default function HomeScreen() {
                   <Text style={styles.budgetDetailValue}>{formatCurrency(budgetUsed)}</Text>
                 </View>
               </View>
+            </View>
+
+            <View style={styles.countersContainer}>
+              <View style={styles.counterCard}>
+                <Text style={styles.counterValue}>{offlineStats.unsynced}</Text>
+                <Text style={styles.counterLabel}>Pendentes</Text>
+              </View>
+              {!isOnline && (
+                <View style={styles.counterCard}>
+                  <Text style={styles.counterValue}>OFF</Text>
+                  <Text style={styles.counterLabel}>Sem conexão</Text>
+                </View>
+              )}
             </View>
           </View>
         </LinearGradient>
@@ -370,6 +411,18 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  offlineBanner: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  offlineBannerText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   modernSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

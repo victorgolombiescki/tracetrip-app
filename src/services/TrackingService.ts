@@ -2,6 +2,7 @@ import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
 import * as TaskManager from 'expo-task-manager';
 import { authService } from './auth/AuthService';
+import { localDatabaseService } from './LocalDatabaseService';
 
 const TRACKING_INTERVAL = 10 * 60 * 1000;
 const BACKGROUND_TASK_NAME = 'background-location-tracking';
@@ -14,6 +15,21 @@ export interface LocationData {
     altitude?: number;
     speed?: number;
     heading?: number;
+}
+
+async function sendOrStoreLocation(locationData: LocationData): Promise<void> {
+    const sent = await sendLocationToAPI(locationData);
+    if (!sent) {
+        try {
+            await localDatabaseService.initialize();
+            await localDatabaseService.saveLocation({
+                latitude: locationData.latitude,
+                longitude: locationData.longitude,
+                timestamp: locationData.timestamp,
+                accuracy: locationData.accuracy,
+            });
+        } catch {}
+    }
 }
 
 async function getAuthToken(): Promise<string | null> {
@@ -110,7 +126,7 @@ TaskManager.defineTask(BACKGROUND_TASK_NAME, async ({ data, error }) => {
             heading: location.coords.heading || undefined,
         };
 
-        await sendLocationToAPI(locationData);
+        await sendOrStoreLocation(locationData);
     } catch (error) { }
 });
 
@@ -120,6 +136,7 @@ class TrackingService {
 
     async initializeTracking(): Promise<boolean> {
         try {
+            await localDatabaseService.initialize();
             const isLocationEnabled = await Location.hasServicesEnabledAsync();
             if (!isLocationEnabled) {
                 return false;
@@ -156,9 +173,11 @@ class TrackingService {
         this.isTracking = true;
         await SecureStore.setItemAsync('tracking_enabled', 'true');
 
+        await this.syncPendingLocations();
         await this.sendLocationUpdate();
 
         this.intervalId = setInterval(async () => {
+            await this.syncPendingLocations();
             await this.sendLocationUpdate();
         }, TRACKING_INTERVAL);
 
@@ -221,10 +240,12 @@ class TrackingService {
                 const hasPermission = await this.initializeTracking();
                 if (hasPermission) {
                     this.isTracking = true;
-                    
+
+                    await this.syncPendingLocations();
                     await this.sendLocationUpdate();
 
                     this.intervalId = setInterval(async () => {
+                        await this.syncPendingLocations();
                         await this.sendLocationUpdate();
                     }, TRACKING_INTERVAL);
 
@@ -295,12 +316,17 @@ class TrackingService {
                 heading: location.coords.heading || undefined,
             };
 
-            await sendLocationToAPI(locationData);
+            await sendOrStoreLocation(locationData);
         } catch (error) { }
     }
 
     async getOfflineStats(): Promise<{ total: number; unsynced: number }> {
-        return { total: 0, unsynced: 0 }; 
+        try {
+            await localDatabaseService.initialize();
+            return await localDatabaseService.getLocationCount();
+        } catch {
+            return { total: 0, unsynced: 0 };
+        }
     }
 
     async openLocationSettings(): Promise<void> {
@@ -313,3 +339,35 @@ class TrackingService {
 }
 
 export const trackingService = new TrackingService();
+
+async function trySyncBatch(): Promise<void> {
+    try {
+        await localDatabaseService.initialize();
+        const online = await localDatabaseService.isOnline();
+        if (!online) return;
+
+        const unsynced = await localDatabaseService.getUnsyncedLocations();
+        if (!unsynced || unsynced.length === 0) return;
+
+        const successIds: number[] = [];
+        for (const rec of unsynced) {
+            const ok = await sendLocationToAPI({
+                latitude: rec.latitude,
+                longitude: rec.longitude,
+                timestamp: rec.timestamp,
+                accuracy: rec.accuracy,
+            });
+            if (ok && rec.id) successIds.push(rec.id);
+        }
+
+        if (successIds.length > 0) {
+            await localDatabaseService.markAsSynced(successIds);
+            await localDatabaseService.deleteSyncedLocations();
+        }
+    } catch {}
+}
+
+// Add as method on prototype without changing class shape significantly
+(TrackingService.prototype as any).syncPendingLocations = async function(): Promise<void> {
+    await trySyncBatch();
+};
