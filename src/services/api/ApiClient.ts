@@ -381,6 +381,10 @@ export class ApiClient {
   async getCurrentRoute(): Promise<ApiResponse<any>> {
     return this.http('GET', `/app/rotas/current`);
   }
+
+  async get<T>(path: string): Promise<ApiResponse<T>> {
+    return this.http<T>('GET', path);
+  }
 }
 
 export const apiClient = new ApiClient();

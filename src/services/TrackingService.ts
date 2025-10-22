@@ -21,14 +21,15 @@ async function sendOrStoreLocation(locationData: LocationData): Promise<void> {
     const sent = await sendLocationToAPI(locationData);
     if (!sent) {
         try {
-            await localDatabaseService.initialize();
             await localDatabaseService.saveLocation({
                 latitude: locationData.latitude,
                 longitude: locationData.longitude,
                 timestamp: locationData.timestamp,
                 accuracy: locationData.accuracy,
             });
-        } catch {}
+        } catch (error) {
+            console.error('❌ Erro ao salvar localização offline:', error);
+        }
     }
 }
 
@@ -322,9 +323,9 @@ class TrackingService {
 
     async getOfflineStats(): Promise<{ total: number; unsynced: number }> {
         try {
-            await localDatabaseService.initialize();
             return await localDatabaseService.getLocationCount();
-        } catch {
+        } catch (error) {
+            console.error('❌ Erro ao obter estatísticas offline:', error);
             return { total: 0, unsynced: 0 };
         }
     }
@@ -342,7 +343,6 @@ export const trackingService = new TrackingService();
 
 async function trySyncBatch(): Promise<void> {
     try {
-        await localDatabaseService.initialize();
         const online = await localDatabaseService.isOnline();
         if (!online) return;
 
@@ -364,7 +364,9 @@ async function trySyncBatch(): Promise<void> {
             await localDatabaseService.markAsSynced(successIds);
             await localDatabaseService.deleteSyncedLocations();
         }
-    } catch {}
+    } catch (error) {
+        console.error('❌ Erro ao sincronizar lote:', error);
+    }
 }
 
 // Add as method on prototype without changing class shape significantly

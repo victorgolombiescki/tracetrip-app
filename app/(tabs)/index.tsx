@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Wallet, ChevronRight, TrendingUp, ArrowDown, CalendarDays, Clock, Receipt, FileBarChart, Home, Map, LogOut } from 'lucide-react-native';
+import { Bell, Wallet, ChevronRight, TrendingUp, ArrowDown, CalendarDays, Clock, Receipt, FileBarChart, Home, MapPin, LogOut, Car, Plus, Settings, BarChart3 } from 'lucide-react-native';
 import { useAppStore } from '@/src/store/useAppStore';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -65,15 +65,20 @@ export default function HomeScreen() {
   const loadCurrentRoute = async () => {
     setLoadingCurrentRoute(true);
     try {
+      console.log('🔄 Carregando rota atual...');
       const response = await RotasApi.getCurrentRoute();
+      console.log('📡 Resposta da API getCurrentRoute:', response);
 
       if (response.success && response.data) {
+        console.log('✅ Rota atual encontrada:', response.data);
         setCurrentRoute(response.data);
         loadDashboardData();
       } else {
+        console.log('⚠️ Nenhuma rota atual encontrada');
         setCurrentRoute(null);
       }
     } catch (error) {
+      console.error('❌ Erro ao carregar rota atual:', error);
       setCurrentRoute(null);
     } finally {
       setLoadingCurrentRoute(false);
@@ -211,18 +216,6 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {(currentRoute || dashboard?.viagem) && (
-            <TouchableOpacity
-              style={styles.currentRouteBanner}
-              onPress={() => currentRoute?.id && router.push({ pathname: '/rotas/[id]', params: { id: currentRoute.id } })}
-              activeOpacity={0.8}
-            >
-              <Map size={14} color="#fff" />
-              <Text style={styles.currentRouteBannerText}>
-                {currentRoute?.nome || dashboard?.viagem}
-              </Text>
-            </TouchableOpacity>
-          )}
 
           <View style={styles.budgetContainer}>
             <View style={styles.budgetHeader}>
@@ -276,6 +269,40 @@ export default function HomeScreen() {
                 </View>
               )}
             </View>
+
+            {/* Banner da Rota Ativa */}
+            <View style={styles.routeBannerContainer}>
+              <TouchableOpacity
+                style={styles.routeBanner}
+                onPress={async () => {
+                  try {
+                    if (currentRoute && currentRoute.id) {
+                      router.push(`/rotas/${currentRoute.id}/mapa`);
+                    } else if (dashboard?.viagem) {
+                      const rotasResponse = await RotasApi.getRotasSimples();
+                      if (rotasResponse.success && rotasResponse.data && rotasResponse.data.length > 0) {
+                        const primeiraRota = rotasResponse.data[0];
+                        router.push(`/rotas/${primeiraRota.id}/mapa`);
+                      } else {
+                        router.push('/rotas/1/mapa');
+                      }
+                    } else {
+                      router.push('/(tabs)/rotas');
+                    }
+                  } catch (error) {
+                    router.push('/(tabs)/rotas');
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.routeBannerIcon}>
+                  <MapPin size={14} color="white" />
+                </View>
+                <Text style={styles.routeBannerText}>
+                  Visualizar rota
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </LinearGradient>
 
@@ -284,7 +311,6 @@ export default function HomeScreen() {
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
-
           <View style={styles.recordsSection}>
             <View style={styles.modernSectionHeader}>
               <Text style={styles.modernSectionTitle}>Despesas</Text>
@@ -703,11 +729,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 16,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     marginBottom: 10,
     alignSelf: 'flex-start',
-    gap: 6,
+    gap: 8,
   },
   currentRouteBannerText: {
     color: 'white',
@@ -827,6 +853,70 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: -0,
     backgroundColor: '#FFFFFF',
+  },
+  routeBannerContainer: {
+    marginTop: 0,
+    marginBottom: 0,
+    alignItems: 'flex-start',
+  },
+  routeBanner: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  routeBannerIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  routeBannerText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'white',
+  },
+  routeBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  routeBannerIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  routeBannerInfo: {
+    flex: 1,
+  },
+  routeBannerTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#64748B',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  routeBannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'white',
+    letterSpacing: -0.2,
+  },
+  routeBannerRight: {
+    padding: 4,
+    backgroundColor: '#F0F4FF',
+    borderRadius: 8,
   },
   contentContainer: {
     paddingBottom: 100,

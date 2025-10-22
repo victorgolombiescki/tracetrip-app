@@ -10,14 +10,28 @@ import * as SystemUI from 'expo-system-ui';
 import { useAppStore } from '@/src/store/useAppStore';
 import ErrorBoundary from '@/src/components/ErrorBoundary';
 import { handleError } from '@/src/utils/errorHandler';
+import { databaseInitializer } from '@/src/services/DatabaseInitializer';
 
 export default function RootLayout() {
   const { auth, setAuth } = useAppStore();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    checkAuth();
+    initializeApp();
   }, []);
+
+  const initializeApp = async () => {
+    try {
+      // Inicializar banco de dados primeiro
+      await databaseInitializer.initialize();
+      
+      // Depois verificar autenticação
+      await checkAuth();
+    } catch (error) {
+      console.error('❌ Erro na inicialização do app:', error);
+      handleError(error, 'Erro na inicialização', true);
+    }
+  };
 
   useEffect(() => { }, []);
 
