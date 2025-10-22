@@ -22,10 +22,8 @@ export default function RootLayout() {
 
   const initializeApp = async () => {
     try {
-      // Inicializar banco de dados primeiro
       await databaseInitializer.initialize();
       
-      // Depois verificar autenticação
       await checkAuth();
     } catch (error) {
       console.error('❌ Erro na inicialização do app:', error);

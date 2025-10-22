@@ -28,7 +28,6 @@ class DatabaseInitializer {
         try {
             await this.initializationPromise;
             this.isInitialized = true;
-            console.log('✅ DatabaseInitializer: Banco inicializado com sucesso');
         } catch (error) {
             console.error('❌ DatabaseInitializer: Erro na inicialização:', error);
             this.initializationPromise = null;
@@ -38,7 +37,6 @@ class DatabaseInitializer {
 
     private async _doInitialize(): Promise<void> {
         try {
-            console.log('🔄 DatabaseInitializer: Iniciando banco de dados...');
             await localDatabaseService.initialize();
         } catch (error) {
             console.error('❌ DatabaseInitializer: Falha na inicialização:', error);
@@ -55,7 +53,6 @@ class DatabaseInitializer {
             await localDatabaseService.reset();
             this.isInitialized = false;
             this.initializationPromise = null;
-            console.log('🔄 DatabaseInitializer: Resetado');
         } catch (error) {
             console.error('❌ DatabaseInitializer: Erro no reset:', error);
         }
@@ -63,4 +60,5 @@ class DatabaseInitializer {
 }
 
 export const databaseInitializer = DatabaseInitializer.getInstance();
+
 

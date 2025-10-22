@@ -13,6 +13,7 @@ import { tryCatch } from '@/src/utils/errorHandler';
 import { TrackingButton } from '@/src/components/TrackingButton';
 import { trackingService } from '@/src/services/TrackingService';
 import NetInfo from '@react-native-community/netinfo';
+import * as TaskManager from 'expo-task-manager';
 
 export default function HomeScreen() {
   const { auth, setCurrentRoute, currentRoute, setAuth } = useAppStore();
@@ -65,16 +66,12 @@ export default function HomeScreen() {
   const loadCurrentRoute = async () => {
     setLoadingCurrentRoute(true);
     try {
-      console.log('🔄 Carregando rota atual...');
       const response = await RotasApi.getCurrentRoute();
-      console.log('📡 Resposta da API getCurrentRoute:', response);
 
       if (response.success && response.data) {
-        console.log('✅ Rota atual encontrada:', response.data);
         setCurrentRoute(response.data);
         loadDashboardData();
       } else {
-        console.log('⚠️ Nenhuma rota atual encontrada');
         setCurrentRoute(null);
       }
     } catch (error) {
@@ -215,6 +212,7 @@ export default function HomeScreen() {
               </Text>
             </View>
           )}
+
 
 
           <View style={styles.budgetContainer}>

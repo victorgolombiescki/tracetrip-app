@@ -1,23 +1,18 @@
 import { Platform } from 'react-native';
 
 export const SQLiteConfig = {
-    // Configurações específicas para diferentes plataformas
     databaseName: 'tracking.db',
     
-    // Configurações de retry
     maxRetries: 3,
-    retryDelay: 1000, // 1 segundo
+    retryDelay: 1000, 
     
-    // Configurações de timeout
-    operationTimeout: 10000, // 10 segundos
+    operationTimeout: 10000, 
     
-    // Configurações de debug
     enableLogging: __DEV__,
     
-    // Configurações específicas por plataforma
     android: {
-        enableWAL: true, // Write-Ahead Logging
-        synchronous: 'NORMAL', // FULL, NORMAL, OFF
+        enableWAL: true,
+        synchronous: 'NORMAL',
     },
     
     ios: {
@@ -25,14 +20,12 @@ export const SQLiteConfig = {
         synchronous: 'NORMAL',
     },
     
-    // Configurações de backup
     backupEnabled: true,
-    backupInterval: 24 * 60 * 60 * 1000, // 24 horas
+    backupInterval: 24 * 60 * 60 * 1000, 
     
-    // Configurações de limpeza
     cleanupEnabled: true,
-    maxRecords: 10000, // Máximo de registros antes de limpar
-    cleanupThreshold: 0.8, // Limpar quando atingir 80% do máximo
+    maxRecords: 10000, 
+    cleanupThreshold: 0.8, 
 };
 
 export const getPlatformConfig = () => {
@@ -56,4 +49,5 @@ export const logSQLiteOperation = (operation: string, success: boolean, error?: 
         console.error(message, error);
     }
 };
+
 

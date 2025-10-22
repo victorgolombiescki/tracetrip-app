@@ -34,16 +34,12 @@ export default function RotaMapaScreen() {
   const loadRotaData = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Carregando dados da rota:', id);
       
       const response = await RotasDetalhesApi.getDetalhesRota(Number(id));
-      console.log('📡 Resposta da API:', response);
       
       if (response.success && response.data) {
         setDetalhe(response.data.data);
-        console.log('✅ Dados carregados:', response.data);
       } else {
-        console.log('❌ Erro ao carregar dados:', response.message);
         Alert.alert('Erro', response.message || 'Não foi possível carregar os dados da rota');
       }
     } catch (error) {
@@ -77,25 +73,16 @@ export default function RotaMapaScreen() {
   };
 
   const generateMapHTML = () => {
-    // Usar dados reais da API ou dados de teste como fallback
     let enderecosParaUsar = detalhe?.enderecos || [];
     
 
-    console.log('🔍 Debug - Endereços antes da ordenação:', enderecosParaUsar.map(e => ({ id: e.id, ordem: e.ordem, nome: e.local?.nome || e.endereco })));
     
     const sortedEnderecos = enderecosParaUsar.sort((a, b) => a.ordem - b.ordem);
-    console.log('🔍 Debug - Endereços após ordenação:', sortedEnderecos.map(e => ({ id: e.id, ordem: e.ordem, nome: e.local?.nome || e.endereco })));
     
     const coordinates = sortedEnderecos
       .filter(endereco => {
         const hasValidCoords = endereco.latitude && endereco.longitude && 
                               !isNaN(endereco.latitude) && !isNaN(endereco.longitude);
-        console.log(`🔍 Debug - Filtro coordenadas para ordem ${endereco.ordem}:`, {
-          nome: endereco.local?.nome || endereco.endereco,
-          lat: endereco.latitude,
-          lng: endereco.longitude,
-          hasValidCoords
-        });
         return hasValidCoords;
       })
       .map(endereco => ({
@@ -106,41 +93,23 @@ export default function RotaMapaScreen() {
         ordem: endereco.ordem
       }));
 
-    console.log(`🔍 Debug - Total de endereços: ${sortedEnderecos.length}, Coordenadas válidas: ${coordinates.length}`);
-    console.log('🔍 Debug - Coordenadas finais:', coordinates.map(c => ({ ordem: c.ordem, nome: c.nome, lat: c.lat, lng: c.lng })));
-
-    // Calcular centro do mapa
     const centerLat = coordinates.reduce((sum, coord) => sum + coord.lat, 0) / coordinates.length;
     const centerLng = coordinates.reduce((sum, coord) => sum + coord.lng, 0) / coordinates.length;
 
-    // Gerar marcadores com offset para coordenadas duplicadas
     const markers = coordinates.map((coord, index) => {
       const color = index === 0 ? 'green' : index === coordinates.length - 1 ? 'red' : 'blue';
       
-      // Adicionar offset maior para evitar sobreposição
       let adjustedLat = coord.lat;
       let adjustedLng = coord.lng;
       
-      // Verificar se há pontos anteriores com as mesmas coordenadas
       for (let i = 0; i < index; i++) {
         if (coordinates[i].lat === coord.lat && coordinates[i].lng === coord.lng) {
-          // Adicionar offset maior para evitar sobreposição
-          const offsetDistance = 0.001; // ~100m de variação
+          const offsetDistance = 0.001;
           adjustedLat += (index % 2 === 0 ? offsetDistance : -offsetDistance);
           adjustedLng += (index % 2 === 0 ? offsetDistance : -offsetDistance);
           break;
         }
       }
-      
-      console.log(`🔍 Debug - Marcador ${index + 1}:`, { 
-        nome: coord.nome, 
-        ordem: coord.ordem, 
-        color,
-        lat: coord.lat, 
-        lng: coord.lng,
-        adjustedLat,
-        adjustedLng
-      });
       
         const endereco = sortedEnderecos[index];
         const dataVisita = endereco.dataVisita ? new Date(endereco.dataVisita).toLocaleDateString('pt-BR') : 'Data não informada';
@@ -181,8 +150,6 @@ export default function RotaMapaScreen() {
       `;
     }).join('\n');
 
-    console.log('🔍 Debug - Marcadores gerados:', markers);
-
     return `
       <!DOCTYPE html>
       <html>
@@ -210,16 +177,14 @@ export default function RotaMapaScreen() {
           
           ${markers}
           
-          // Ajustar zoom para mostrar todos os pontos
           const group = new L.featureGroup();
           ${coordinates.map((coord, index) => {
             let adjustedLat = coord.lat;
             let adjustedLng = coord.lng;
             
-            // Aplicar mesmo offset usado nos marcadores
             for (let i = 0; i < index; i++) {
               if (coordinates[i].lat === coord.lat && coordinates[i].lng === coord.lng) {
-                const offsetDistance = 0.001; // ~100m de variação
+                const offsetDistance = 0.001; 
                 adjustedLat += (index % 2 === 0 ? offsetDistance : -offsetDistance);
                 adjustedLng += (index % 2 === 0 ? offsetDistance : -offsetDistance);
                 break;
@@ -257,7 +222,6 @@ export default function RotaMapaScreen() {
   }
 
   if (!detalhe) {
-    console.log('🔍 Debug - Renderizando estado de erro...');
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient colors={["#2563EB", "#1D4ED8"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
@@ -278,8 +242,6 @@ export default function RotaMapaScreen() {
       </SafeAreaView>
     );
   }
-
-  console.log('🔍 Debug - Renderizando mapa principal...');
   
   return (
     <SafeAreaView style={styles.container}>

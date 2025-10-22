@@ -18,17 +18,14 @@ class LocalDatabaseService {
     private initializationPromise: Promise<void> | null = null;
 
     async initialize(): Promise<void> {
-        // Se já está inicializado, retorna imediatamente
         if (this.db) {
             return;
         }
 
-        // Se já está inicializando, aguarda a inicialização em andamento
         if (this.isInitializing && this.initializationPromise) {
             return this.initializationPromise;
         }
 
-        // Inicia nova inicialização
         this.isInitializing = true;
         this.initializationPromise = this._doInitialize();
 
@@ -42,17 +39,14 @@ class LocalDatabaseService {
 
     private async _doInitialize(): Promise<void> {
         try {
-            console.log('🔄 Inicializando banco de dados...');
-            
             this.db = await SQLite.openDatabaseAsync(SQLiteConfig.databaseName);
-            
+
             if (!this.db) {
                 throw new Error('Falha ao abrir banco de dados');
             }
-            
-            // Configurar banco com configurações específicas da plataforma
+
             await this.configureDatabase();
-            
+
             await this.createTables();
             logSQLiteOperation('initialize', true);
         } catch (error) {
@@ -67,25 +61,21 @@ class LocalDatabaseService {
 
         try {
             const platformConfig = getPlatformConfig();
-            
-            // Configurar WAL se suportado
+
             if (platformConfig.enableWAL) {
                 await this.db.execAsync('PRAGMA journal_mode=WAL');
             }
-            
-            // Configurar modo síncrono
+
             if (platformConfig.synchronous) {
                 await this.db.execAsync(`PRAGMA synchronous=${platformConfig.synchronous}`);
             }
-            
-            // Configurações de performance
+
             await this.db.execAsync('PRAGMA cache_size=10000');
             await this.db.execAsync('PRAGMA temp_store=MEMORY');
-            
+
             logSQLiteOperation('configure', true);
         } catch (error) {
             logSQLiteOperation('configure', false, error);
-            // Não falhar se configuração não funcionar
         }
     }
 
@@ -95,7 +85,7 @@ class LocalDatabaseService {
             return;
         }
 
-        try {            
+        try {
             await this.db.execAsync(`
                 CREATE TABLE IF NOT EXISTS locations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,7 +107,7 @@ class LocalDatabaseService {
                 CREATE INDEX IF NOT EXISTS idx_locations_timestamp 
                 ON locations(timestamp);
             `);
-            
+
         } catch (error) {
             console.error('❌ Erro ao criar tabelas:', error);
             throw error;
@@ -229,12 +219,10 @@ class LocalDatabaseService {
         }
     }
 
-    // Método para verificar se o banco está pronto
     isReady(): boolean {
         return this.db !== null;
     }
 
-    // Método para resetar o banco em caso de erro crítico
     async reset(): Promise<void> {
         try {
             if (this.db) {
@@ -243,12 +231,10 @@ class LocalDatabaseService {
         } catch (error) {
             console.warn('⚠️ Erro ao fechar banco:', error);
         }
-        
+
         this.db = null;
         this.isInitializing = false;
         this.initializationPromise = null;
-        
-        console.log('🔄 Banco de dados resetado');
     }
 }
 
