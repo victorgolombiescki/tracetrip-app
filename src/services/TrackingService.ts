@@ -2,6 +2,7 @@ import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
 import * as TaskManager from 'expo-task-manager';
 import { authService } from './auth/AuthService';
+import { localDatabaseService } from './LocalDatabaseService';
 
 const TRACKING_INTERVAL = 10 * 60 * 1000;
 const BACKGROUND_TASK_NAME = 'background-location-tracking';
@@ -14,6 +15,22 @@ export interface LocationData {
     altitude?: number;
     speed?: number;
     heading?: number;
+}
+
+async function sendOrStoreLocation(locationData: LocationData): Promise<void> {
+    const sent = await sendLocationToAPI(locationData);
+    if (!sent) {
+        try {
+            await localDatabaseService.saveLocation({
+                latitude: locationData.latitude,
+                longitude: locationData.longitude,
+                timestamp: locationData.timestamp,
+                accuracy: locationData.accuracy,
+            });
+        } catch (error) {
+            console.error('❌ Erro ao salvar localização offline:', error);
+        }
+    }
 }
 
 async function getAuthToken(): Promise<string | null> {
@@ -58,18 +75,26 @@ async function sendLocationToAPI(locationData: LocationData): Promise<boolean> {
             body: JSON.stringify(payload)
         });
 
-        return response.ok;
+        if (response.ok) {
+            return true;
+        } else {
+            return false;
+        }
     } catch (error) {
+        console.error('❌ Erro ao enviar para API:', error);
         return false;
     }
 }
 
 TaskManager.defineTask(BACKGROUND_TASK_NAME, async ({ data, error }) => {
+    
     if (error) {
+        console.error('❌ Background task error:', error);
         return;
     }
 
     try {
+        
         const trackingEnabled = await SecureStore.getItemAsync('tracking_enabled');
         if (trackingEnabled !== 'true') {
             return;
@@ -83,12 +108,14 @@ TaskManager.defineTask(BACKGROUND_TASK_NAME, async ({ data, error }) => {
         let location;
         try {
             location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced
+                accuracy: Location.Accuracy.Balanced,
+                timeout: 10000, 
             });
         } catch (firstError) {
             try {
                 location = await Location.getCurrentPositionAsync({
-                    accuracy: Location.Accuracy.Lowest
+                    accuracy: Location.Accuracy.Lowest,
+                    timeout: 15000, 
                 });
             } catch (secondError) {
                 const lastKnownLocation = await Location.getLastKnownPositionAsync();
@@ -109,9 +136,10 @@ TaskManager.defineTask(BACKGROUND_TASK_NAME, async ({ data, error }) => {
             speed: location.coords.speed || undefined,
             heading: location.coords.heading || undefined,
         };
-
-        await sendLocationToAPI(locationData);
-    } catch (error) { }
+        await sendOrStoreLocation(locationData);
+    } catch (error) {
+        console.error('❌ Erro no background task:', error);
+    }
 });
 
 class TrackingService {
@@ -120,25 +148,29 @@ class TrackingService {
 
     async initializeTracking(): Promise<boolean> {
         try {
+            await localDatabaseService.initialize();
+            
             const isLocationEnabled = await Location.hasServicesEnabledAsync();
             if (!isLocationEnabled) {
                 return false;
             }
 
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
+            const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+            if (foregroundStatus !== 'granted') {
                 return false;
             }
 
             try {
-                const backgroundStatus = await Location.getBackgroundPermissionsAsync();
-                if (backgroundStatus.status !== 'granted') {
-                    await Location.requestBackgroundPermissionsAsync();
+                const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+                if (backgroundStatus !== 'granted') {
+
                 }
-            } catch (bgError) { }
+            } catch (bgError) {
+            }
 
             return true;
         } catch (error) {
+            console.error('❌ Erro ao inicializar tracking:', error);
             return false;
         }
     }
@@ -156,19 +188,22 @@ class TrackingService {
         this.isTracking = true;
         await SecureStore.setItemAsync('tracking_enabled', 'true');
 
+        await this.syncPendingLocations();
         await this.sendLocationUpdate();
 
         this.intervalId = setInterval(async () => {
+            await this.syncPendingLocations();
             await this.sendLocationUpdate();
         }, TRACKING_INTERVAL);
 
         try {
             const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
+            
             if (!isTaskRegistered) {
                 await Location.startLocationUpdatesAsync(BACKGROUND_TASK_NAME, {
                     accuracy: Location.Accuracy.Balanced,
                     timeInterval: TRACKING_INTERVAL,
-                    distanceInterval: 0,
+                    distanceInterval: 10,
                     foregroundService: {
                         notificationTitle: 'TraceTrip Rastreamento',
                         notificationBody: 'Rastreamento ativo quando minimizado',
@@ -176,10 +211,16 @@ class TrackingService {
                         killServiceOnDestroy: false,
                     },
                     deferredUpdatesInterval: TRACKING_INTERVAL,
-                    deferredUpdatesDistance: 0,
+                    deferredUpdatesDistance: 10,
+                    showsBackgroundLocationIndicator: true,
+                    mayShowUserSettingsDialog: true,
                 });
+                
+                const isNowRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
             }
         } catch (error) {
+            console.error('❌ Erro ao iniciar background tracking:', error);
+            console.error('❌ Detalhes do erro:', error.message);
         }
     }
 
@@ -221,10 +262,12 @@ class TrackingService {
                 const hasPermission = await this.initializeTracking();
                 if (hasPermission) {
                     this.isTracking = true;
-                    
+
+                    await this.syncPendingLocations();
                     await this.sendLocationUpdate();
 
                     this.intervalId = setInterval(async () => {
+                        await this.syncPendingLocations();
                         await this.sendLocationUpdate();
                     }, TRACKING_INTERVAL);
 
@@ -234,7 +277,7 @@ class TrackingService {
                             await Location.startLocationUpdatesAsync(BACKGROUND_TASK_NAME, {
                                 accuracy: Location.Accuracy.Balanced,
                                 timeInterval: TRACKING_INTERVAL,
-                                distanceInterval: 0,
+                                distanceInterval: 10,
                                 foregroundService: {
                                     notificationTitle: 'TraceTrip Rastreamento',
                                     notificationBody: 'Rastreamento ativo quando minimizado',
@@ -242,10 +285,13 @@ class TrackingService {
                                     killServiceOnDestroy: false,
                                 },
                                 deferredUpdatesInterval: TRACKING_INTERVAL,
-                                deferredUpdatesDistance: 0,
+                                deferredUpdatesDistance: 10,
+                                showsBackgroundLocationIndicator: true,
                             });
                         }
-                    } catch (error) {  }
+                    } catch (error) {
+                        console.error('❌ Erro ao restaurar background tracking:', error);
+                    }
                 } else {
                     await SecureStore.setItemAsync('tracking_enabled', 'false');
                 }
@@ -295,12 +341,19 @@ class TrackingService {
                 heading: location.coords.heading || undefined,
             };
 
-            await sendLocationToAPI(locationData);
-        } catch (error) { }
+            await sendOrStoreLocation(locationData);
+        } catch (error) {
+            console.error('❌ Erro em sendLocationUpdate:', error);
+        }
     }
 
     async getOfflineStats(): Promise<{ total: number; unsynced: number }> {
-        return { total: 0, unsynced: 0 }; 
+        try {
+            return await localDatabaseService.getLocationCount();
+        } catch (error) {
+            console.error('❌ Erro ao obter estatísticas offline:', error);
+            return { total: 0, unsynced: 0 };
+        }
     }
 
     async openLocationSettings(): Promise<void> {
@@ -310,6 +363,39 @@ class TrackingService {
             console.error('Erro ao abrir configurações:', error);
         }
     }
+
 }
 
 export const trackingService = new TrackingService();
+
+async function trySyncBatch(): Promise<void> {
+    try {
+        const online = await localDatabaseService.isOnline();
+        if (!online) return;
+
+        const unsynced = await localDatabaseService.getUnsyncedLocations();
+        if (!unsynced || unsynced.length === 0) return;
+
+        const successIds: number[] = [];
+        for (const rec of unsynced) {
+            const ok = await sendLocationToAPI({
+                latitude: rec.latitude,
+                longitude: rec.longitude,
+                timestamp: rec.timestamp,
+                accuracy: rec.accuracy,
+            });
+            if (ok && rec.id) successIds.push(rec.id);
+        }
+
+        if (successIds.length > 0) {
+            await localDatabaseService.markAsSynced(successIds);
+            await localDatabaseService.deleteSyncedLocations();
+        }
+    } catch (error) {
+        console.error('❌ Erro ao sincronizar lote:', error);
+    }
+}
+
+(TrackingService.prototype as any).syncPendingLocations = async function(): Promise<void> {
+    await trySyncBatch();
+};

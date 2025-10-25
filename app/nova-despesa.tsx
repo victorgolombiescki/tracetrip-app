@@ -97,7 +97,6 @@ export default function NovaDespesaScreen() {
   const loadRotas = async () => {
     try {
       const response = await RotasApi.getRotasSimples();
-      console.log('response', response);
       if (response.success) {
         const rotas = (response.data || []) as RotaSimples[];
         

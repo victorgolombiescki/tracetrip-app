@@ -42,7 +42,14 @@ export class AuthService {
   async validateToken(token?: string): Promise<boolean> {
     try {
       const res = await apiClient.validateToken(token);
-      if (!res.success) return false;
+      if (!res.success) {
+        const msg = (res.message || '').toLowerCase();
+        if (token && (msg.includes('sem conexão') || msg.includes('conectar') || msg.includes('network'))) {
+          apiClient.setToken(token);
+          return true;
+        }
+        return false;
+      }
       const ok = (res.data as any)?.autorized ?? (res.data as any)?.authorized;
       
       if (ok && token) {
@@ -51,6 +58,10 @@ export class AuthService {
       
       return Boolean(ok);
     } catch (e) {
+      if (token) {
+        apiClient.setToken(token);
+        return true;
+      }
       return false;
     }
   }

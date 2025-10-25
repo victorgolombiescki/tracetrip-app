@@ -7,7 +7,6 @@ import Toast from 'react-native-toast-message';
  * @param silent Se verdadeiro, não exibe toast (apenas loga o erro)
  */
 export const handleError = (error: any, customMessage?: string, silent: boolean = false): void => {
-  // Log do erro para debugging
   console.error('Error caught:', error);
 
   if (silent) return;

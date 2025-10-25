@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Wallet, ChevronRight, TrendingUp, ArrowDown, CalendarDays, Clock, Receipt, FileBarChart, Home, Map, LogOut } from 'lucide-react-native';
+import { Bell, Wallet, ChevronRight, TrendingUp, ArrowDown, CalendarDays, Clock, Receipt, FileBarChart, Home, MapPin, LogOut, Car, Plus, Settings, BarChart3 } from 'lucide-react-native';
 import { useAppStore } from '@/src/store/useAppStore';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -12,6 +12,8 @@ import ErrorBoundary from '@/src/components/ErrorBoundary';
 import { tryCatch } from '@/src/utils/errorHandler';
 import { TrackingButton } from '@/src/components/TrackingButton';
 import { trackingService } from '@/src/services/TrackingService';
+import NetInfo from '@react-native-community/netinfo';
+import * as TaskManager from 'expo-task-manager';
 
 export default function HomeScreen() {
   const { auth, setCurrentRoute, currentRoute, setAuth } = useAppStore();
@@ -28,6 +30,8 @@ export default function HomeScreen() {
     viagem?: string;
   } | null>(null);
   const [loadingCurrentRoute, setLoadingCurrentRoute] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [offlineStats, setOfflineStats] = useState<{ total: number; unsynced: number }>({ total: 0, unsynced: 0 });
   const { width } = useWindowDimensions();
 
   useFocusEffect(
@@ -37,7 +41,25 @@ export default function HomeScreen() {
       
       trackingService.restoreTrackingIfEnabled();
       
-      return () => { };
+      const unsubscribe = NetInfo.addEventListener(state => {
+        const online = (state.isConnected === true) && (state.isInternetReachable !== false);
+        setIsOnline(online);
+      });
+
+      let intervalId: any;
+      const loadStats = async () => {
+        try {
+          const stats = await trackingService.getOfflineStats();
+          setOfflineStats(stats);
+        } catch {}
+      };
+      loadStats();
+      intervalId = setInterval(loadStats, 15000);
+      
+      return () => { 
+        try { unsubscribe(); } catch {}
+        try { if (intervalId) clearInterval(intervalId); } catch {}
+      };
     }, [])
   );
 
@@ -53,6 +75,7 @@ export default function HomeScreen() {
         setCurrentRoute(null);
       }
     } catch (error) {
+      console.error('❌ Erro ao carregar rota atual:', error);
       setCurrentRoute(null);
     } finally {
       setLoadingCurrentRoute(false);
@@ -182,19 +205,15 @@ export default function HomeScreen() {
             </View>
             
           </View>
-
-          {(currentRoute || dashboard?.viagem) && (
-            <TouchableOpacity
-              style={styles.currentRouteBanner}
-              onPress={() => currentRoute?.id && router.push({ pathname: '/rotas/[id]', params: { id: currentRoute.id } })}
-              activeOpacity={0.8}
-            >
-              <Map size={14} color="#fff" />
-              <Text style={styles.currentRouteBannerText}>
-                {currentRoute?.nome || dashboard?.viagem}
+          {!isOnline && (
+            <View style={styles.offlineBanner}>
+              <Text style={styles.offlineBannerText}>
+                Sem conexão. Coleta de localização continua offline ({offlineStats.unsynced} pendente{offlineStats.unsynced === 1 ? '' : 's'}).
               </Text>
-            </TouchableOpacity>
+            </View>
           )}
+
+
 
           <View style={styles.budgetContainer}>
             <View style={styles.budgetHeader}>
@@ -235,6 +254,53 @@ export default function HomeScreen() {
                 </View>
               </View>
             </View>
+
+            <View style={styles.countersContainer}>
+              <View style={styles.counterCard}>
+                <Text style={styles.counterValue}>{offlineStats.unsynced}</Text>
+                <Text style={styles.counterLabel}>Pendentes</Text>
+              </View>
+              {!isOnline && (
+                <View style={styles.counterCard}>
+                  <Text style={styles.counterValue}>OFF</Text>
+                  <Text style={styles.counterLabel}>Sem conexão</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Banner da Rota Ativa */}
+            <View style={styles.routeBannerContainer}>
+              <TouchableOpacity
+                style={styles.routeBanner}
+                onPress={async () => {
+                  try {
+                    if (currentRoute && currentRoute.id) {
+                      router.push(`/rotas/${currentRoute.id}/mapa`);
+                    } else if (dashboard?.viagem) {
+                      const rotasResponse = await RotasApi.getRotasSimples();
+                      if (rotasResponse.success && rotasResponse.data && rotasResponse.data.length > 0) {
+                        const primeiraRota = rotasResponse.data[0];
+                        router.push(`/rotas/${primeiraRota.id}/mapa`);
+                      } else {
+                        router.push('/rotas/1/mapa');
+                      }
+                    } else {
+                      router.push('/(tabs)/rotas');
+                    }
+                  } catch (error) {
+                    router.push('/(tabs)/rotas');
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.routeBannerIcon}>
+                  <MapPin size={14} color="white" />
+                </View>
+                <Text style={styles.routeBannerText}>
+                  Visualizar rota
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </LinearGradient>
 
@@ -243,7 +309,6 @@ export default function HomeScreen() {
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
-
           <View style={styles.recordsSection}>
             <View style={styles.modernSectionHeader}>
               <Text style={styles.modernSectionTitle}>Despesas</Text>
@@ -370,6 +435,18 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  offlineBanner: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  offlineBannerText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   modernSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -650,11 +727,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 16,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     marginBottom: 10,
     alignSelf: 'flex-start',
-    gap: 6,
+    gap: 8,
   },
   currentRouteBannerText: {
     color: 'white',
@@ -774,6 +851,70 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: -0,
     backgroundColor: '#FFFFFF',
+  },
+  routeBannerContainer: {
+    marginTop: 0,
+    marginBottom: 0,
+    alignItems: 'flex-start',
+  },
+  routeBanner: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  routeBannerIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  routeBannerText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'white',
+  },
+  routeBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  routeBannerIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  routeBannerInfo: {
+    flex: 1,
+  },
+  routeBannerTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#64748B',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  routeBannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'white',
+    letterSpacing: -0.2,
+  },
+  routeBannerRight: {
+    padding: 4,
+    backgroundColor: '#F0F4FF',
+    borderRadius: 8,
   },
   contentContainer: {
     paddingBottom: 100,
