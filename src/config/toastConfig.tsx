@@ -74,7 +74,7 @@ export const toastConfig: ToastConfig = {
       text1Style={{
         fontSize: 16,
         fontWeight: '600',
-        color: '#1E40AF',
+        color: '#254985',
       }}
       text2Style={{
         fontSize: 14,

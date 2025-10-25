@@ -118,7 +118,7 @@ export default function RotaDetailScreen() {
   if (!detalhe) {
     return (
       <SafeAreaView style={styles.container}>
-        <LinearGradient colors={["#1E40AF", "#1E40AF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <View style={styles.heroRow}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
               <ArrowLeft size={22} color="#fff" />
@@ -149,7 +149,7 @@ export default function RotaDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient colors={["#1E40AF", "#1E40AF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+      <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <View style={styles.heroRow}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <ArrowLeft size={22} color="#fff" />
@@ -164,21 +164,21 @@ export default function RotaDetailScreen() {
           <Text style={styles.sectionTitle}>{detalhe.nomeViagem}</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
-              <Wallet size={18} color="#1E40AF" />
+              <Wallet size={18} color="#254985" />
               <View style={styles.statTexts}>
                 <Text style={styles.statLabel}>Orçamento</Text>
                 <Text style={styles.statValue}>{fmt(detalhe.orcamentoTotal)}</Text>
               </View>
             </View>
             <View style={styles.statCard}>
-              <Info size={18} color="#1E40AF" />
+              <Info size={18} color="#254985" />
               <View style={styles.statTexts}>
                 <Text style={styles.statLabel}>Usado</Text>
                 <Text style={styles.statValue}>{fmt(detalhe.despesasTotal)} ({usoPct}%)</Text>
               </View>
             </View>
             <View style={styles.statCard}>
-              <Info size={18} color="#1E40AF" />
+              <Info size={18} color="#254985" />
               <View style={styles.statTexts}>
                 <Text style={styles.statLabel}>Restante</Text>
                 <Text style={styles.statValue}>{fmt(restante)}</Text>
@@ -273,7 +273,7 @@ export default function RotaDetailScreen() {
                       activeOpacity={0.7}
                     >
                       <View style={styles.visitaHeaderLeft}>
-                        <MapPin size={18} color="#1E40AF" />
+                        <MapPin size={18} color="#254985" />
                         <View style={styles.visitaHeaderInfo}>
                           <Text style={styles.visitaTitulo}>{visita.titulo}</Text>
                           {visita.local && (
@@ -436,7 +436,7 @@ export default function RotaDetailScreen() {
                   return (
                     <View key={idx} style={[styles.ocCard, { borderLeftColor: lineColor }]}> 
                       <View style={[styles.ocBadge, { backgroundColor: badgeBg }] }>
-                        {tipo === 'ocorrencia' ? <AlertTriangle size={14} color="#92400E" /> : <ListChecks size={14} color="#1E40AF" />}
+                        {tipo === 'ocorrencia' ? <AlertTriangle size={14} color="#92400E" /> : <ListChecks size={14} color="#254985" />}
                         <Text style={styles.ocBadgeText}>{tipo}</Text>
                       </View>
                       <Text style={styles.ocMain}>{when}{when ? ' • ' : ''}{actor}</Text>
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
   participantsChips: { flexDirection:'row', gap:8, alignItems:'flex-start', flexWrap:'wrap' },
   chipsWrap: { flexDirection:'row', flexWrap:'wrap', gap:8, flex:1, width:'100%' },
   chip: { backgroundColor:'#EEF2FF', borderColor:'#C7D2FE', borderWidth:1, paddingVertical:6, paddingHorizontal:10, borderRadius:999, alignSelf:'flex-start', maxWidth:'100%' },
-  chipText: { color:'#1E40AF', fontWeight:'600' },
+  chipText: { color:'#254985', fontWeight:'600' },
 
   breakHeader: { flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:4 },
   breakLabel: { color:'#333333', fontSize: 12 },

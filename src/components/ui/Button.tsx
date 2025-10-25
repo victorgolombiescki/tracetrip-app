@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   primary: {
-    backgroundColor: '#1E40AF',
+    backgroundColor: '#254985',
   },
   secondary: {
     backgroundColor: '#6B7280',

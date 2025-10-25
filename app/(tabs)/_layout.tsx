@@ -20,7 +20,7 @@ export default function TabLayout() {
     <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
       <Icon 
         size={24} 
-        color={focused ? '#1E40AF' : '#6B7280'} 
+        color={focused ? '#254985' : '#6B7280'} 
         weight={focused ? "fill" : weight} 
       />
     </View>
@@ -31,7 +31,7 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: '#1E40AF',
+          tabBarActiveTintColor: '#254985',
           tabBarInactiveTintColor: '#6B7280',
           tabBarStyle: {
             position: 'absolute',
@@ -133,7 +133,7 @@ export default function TabLayout() {
             >
               <View style={styles.actionLeft}>
                 <View style={styles.actionIconWrap}>
-                  <Receipt size={20} color="#1E40AF" weight="duotone" />
+                  <Receipt size={20} color="#254985" weight="duotone" />
                 </View>
                 <View style={styles.actionTexts}>
                   <Text style={styles.actionTitle}>Nova despesa</Text>
@@ -153,7 +153,7 @@ export default function TabLayout() {
             >
               <View style={styles.actionLeft}>
                 <View style={styles.actionIconWrap}>
-                  <Microphone size={20} color="#1E40AF" weight="duotone" />
+                  <Microphone size={20} color="#254985" weight="duotone" />
                 </View>
                 <View style={styles.actionTexts}>
                   <Text style={styles.actionTitle}>Ocorrência</Text>
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#1E40AF',
+    backgroundColor: '#254985',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',

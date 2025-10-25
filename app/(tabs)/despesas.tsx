@@ -260,9 +260,9 @@ export default function DespesasScreen() {
                     disabled={loadingImage === item.id}
                   >
                     {loadingImage === item.id ? (
-                      <ActivityIndicator size={16} color="#1E40AF" />
+                      <ActivityIndicator size={16} color="#254985" />
                     ) : (
-                      <Eye size={18} color="#1E40AF" />
+                      <Eye size={18} color="#254985" />
                     )}
                   </TouchableOpacity>
                 )}
@@ -284,7 +284,7 @@ export default function DespesasScreen() {
     
     return (
       <View style={styles.loadingMoreContainer}>
-        <ActivityIndicator size="small" color="#1E40AF" />
+        <ActivityIndicator size="small" color="#254985" />
         <Text style={styles.loadingMoreText}>Carregando mais despesas...</Text>
       </View>
     );
@@ -293,7 +293,7 @@ export default function DespesasScreen() {
   return (
     <ErrorBoundary>
       <SafeAreaView style={styles.container}>
-        <LinearGradient colors={["#1E40AF", "#1E40AF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <View style={styles.heroRow}>
             <View style={styles.heroTitleContainer}>
               <View style={styles.heroIconContainer}>

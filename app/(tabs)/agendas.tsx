@@ -210,14 +210,14 @@ export default function AgendasScreen() {
   const markedDates = useMemo(() => {
     const acc: any = {};
     Object.keys(countsByDate || {}).forEach((key) => {
-      if (countsByDate[key] > 0) acc[key] = { marked: true, dotColor: '#1E40AF' };
+      if (countsByDate[key] > 0) acc[key] = { marked: true, dotColor: '#254985' };
     });
     
     if (filterDate) {
       acc[filterDate] = { 
         ...acc[filterDate],
         selected: true, 
-        selectedColor: '#1E40AF'
+        selectedColor: '#254985'
       };
     }
     
@@ -225,7 +225,7 @@ export default function AgendasScreen() {
   }, [countsByDate, filterDate]);
 
   const getStatusTheme = (status?: string) => {
-    if (!status) return { bg: '#EEF2FF', border: '#C7D2FE', text: '#1E40AF' };
+    if (!status) return { bg: '#EEF2FF', border: '#C7D2FE', text: '#254985' };
     const norm = status.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
     switch (norm) {
       case 'AGUARDANDO':
@@ -235,7 +235,7 @@ export default function AgendasScreen() {
       case 'CONCLUIDO':
         return { bg: '#ECFDF5', border: '#A7F3D0', text: '#065F46' }; 
       default:
-        return { bg: '#EEF2FF', border: '#C7D2FE', text: '#1E40AF' };
+        return { bg: '#EEF2FF', border: '#C7D2FE', text: '#254985' };
     }
   };
 
@@ -263,7 +263,7 @@ export default function AgendasScreen() {
                   </View>
                 ) : null}
                 <View style={styles.checklistBadge}>
-                  <CheckSquare size={14} color="#1E40AF" />
+                  <CheckSquare size={14} color="#254985" />
                   <Text style={styles.checklistText}>Checklist</Text>
                 </View>
               </View>
@@ -272,7 +272,7 @@ export default function AgendasScreen() {
             <View style={styles.agendaDetails}>
               <View style={styles.timeInfo}>
                 <View style={styles.iconBackground}>
-                  <Clock size={16} color="#1E40AF" />
+                  <Clock size={16} color="#254985" />
                 </View>
                 <Text style={styles.timeText}>
                   {inicio.time} - {fim.time}
@@ -283,7 +283,7 @@ export default function AgendasScreen() {
               {item.local && (
                 <View style={styles.locationInfo}>
                   <View style={styles.iconBackground}>
-                    <MapPin size={16} color="#1E40AF" />
+                    <MapPin size={16} color="#254985" />
                   </View>
                   <Text style={styles.locationText} numberOfLines={1}>{item.local}</Text>
                 </View>
@@ -370,7 +370,7 @@ export default function AgendasScreen() {
   return (
     <ErrorBoundary>
       <SafeAreaView style={styles.container}>
-        <LinearGradient colors={["#1E40AF", "#1E40AF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <View style={styles.heroRow}>
             <View style={styles.heroTitleContainer}>
               <View style={styles.heroIconContainer}>
