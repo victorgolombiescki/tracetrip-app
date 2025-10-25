@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import NetInfo from '@react-native-community/netinfo';
+import { SQLiteConfig, getPlatformConfig, logSQLiteOperation } from '@/src/config/SQLiteConfig';
 
 export interface LocationRecord {
     id?: number;
@@ -13,21 +14,68 @@ export interface LocationRecord {
 
 class LocalDatabaseService {
     private db: SQLite.SQLiteDatabase | null = null;
+    private isInitializing = false;
+    private initializationPromise: Promise<void> | null = null;
 
     async initialize(): Promise<void> {
+        if (this.db) {
+            return;
+        }
+
+        if (this.isInitializing && this.initializationPromise) {
+            return this.initializationPromise;
+        }
+
+        this.isInitializing = true;
+        this.initializationPromise = this._doInitialize();
+
         try {
-            this.db = await SQLite.openDatabaseAsync('tracking.db');
-            
+            await this.initializationPromise;
+        } finally {
+            this.isInitializing = false;
+            this.initializationPromise = null;
+        }
+    }
+
+    private async _doInitialize(): Promise<void> {
+        try {
+            this.db = await SQLite.openDatabaseAsync(SQLiteConfig.databaseName);
+
             if (!this.db) {
                 throw new Error('Falha ao abrir banco de dados');
             }
-            
+
+            await this.configureDatabase();
+
             await this.createTables();
+            logSQLiteOperation('initialize', true);
         } catch (error) {
-            console.error('❌ Erro ao inicializar banco local:', error);
-            setTimeout(() => {
-                this.initialize().catch(console.error);
-            }, 1000);
+            logSQLiteOperation('initialize', false, error);
+            this.db = null;
+            throw error;
+        }
+    }
+
+    private async configureDatabase(): Promise<void> {
+        if (!this.db) return;
+
+        try {
+            const platformConfig = getPlatformConfig();
+
+            if (platformConfig.enableWAL) {
+                await this.db.execAsync('PRAGMA journal_mode=WAL');
+            }
+
+            if (platformConfig.synchronous) {
+                await this.db.execAsync(`PRAGMA synchronous=${platformConfig.synchronous}`);
+            }
+
+            await this.db.execAsync('PRAGMA cache_size=10000');
+            await this.db.execAsync('PRAGMA temp_store=MEMORY');
+
+            logSQLiteOperation('configure', true);
+        } catch (error) {
+            logSQLiteOperation('configure', false, error);
         }
     }
 
@@ -37,7 +85,7 @@ class LocalDatabaseService {
             return;
         }
 
-        try {            
+        try {
             await this.db.execAsync(`
                 CREATE TABLE IF NOT EXISTS locations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +107,7 @@ class LocalDatabaseService {
                 CREATE INDEX IF NOT EXISTS idx_locations_timestamp 
                 ON locations(timestamp);
             `);
-            
+
         } catch (error) {
             console.error('❌ Erro ao criar tabelas:', error);
             throw error;
@@ -68,59 +116,125 @@ class LocalDatabaseService {
 
     async saveLocation(location: Omit<LocationRecord, 'id' | 'synced' | 'createdAt'>): Promise<number> {
         if (!this.db) {
+            await this.initialize();
+        }
+
+        if (!this.db) {
             throw new Error('Banco de dados não inicializado');
         }
 
-        const result = await this.db.runAsync(
-            `INSERT INTO locations (latitude, longitude, timestamp, accuracy, synced) 
-             VALUES (?, ?, ?, ?, ?)`,
-            [location.latitude, location.longitude, location.timestamp, location.accuracy || null, false]
-        );
+        try {
+            const result = await this.db.runAsync(
+                `INSERT INTO locations (latitude, longitude, timestamp, accuracy, synced) 
+                 VALUES (?, ?, ?, ?, ?)`,
+                [location.latitude, location.longitude, location.timestamp, location.accuracy || null, false]
+            );
 
-        return result.lastInsertRowId;
+            return result.lastInsertRowId;
+        } catch (error) {
+            console.error('❌ Erro ao salvar localização:', error);
+            throw error;
+        }
     }
 
     async getUnsyncedLocations(): Promise<LocationRecord[]> {
+        if (!this.db) {
+            await this.initialize();
+        }
+
         if (!this.db) return [];
 
-        const result = await this.db.getAllAsync(
-            'SELECT * FROM locations WHERE synced = FALSE ORDER BY timestamp ASC'
-        );
+        try {
+            const result = await this.db.getAllAsync(
+                'SELECT * FROM locations WHERE synced = FALSE ORDER BY timestamp ASC'
+            );
 
-        return result as LocationRecord[];
+            return result as LocationRecord[];
+        } catch (error) {
+            console.error('❌ Erro ao buscar localizações não sincronizadas:', error);
+            return [];
+        }
     }
 
     async markAsSynced(ids: number[]): Promise<void> {
+        if (!this.db) {
+            await this.initialize();
+        }
+
         if (!this.db || ids.length === 0) return;
 
-        const placeholders = ids.map(() => '?').join(',');
-        await this.db.runAsync(
-            `UPDATE locations SET synced = TRUE WHERE id IN (${placeholders})`,
-            ids
-        );
+        try {
+            const placeholders = ids.map(() => '?').join(',');
+            await this.db.runAsync(
+                `UPDATE locations SET synced = TRUE WHERE id IN (${placeholders})`,
+                ids
+            );
+        } catch (error) {
+            console.error('❌ Erro ao marcar como sincronizado:', error);
+        }
     }
 
     async deleteSyncedLocations(): Promise<void> {
+        if (!this.db) {
+            await this.initialize();
+        }
+
         if (!this.db) return;
 
-        const result = await this.db.runAsync('DELETE FROM locations WHERE synced = TRUE');
+        try {
+            await this.db.runAsync('DELETE FROM locations WHERE synced = TRUE');
+        } catch (error) {
+            console.error('❌ Erro ao deletar localizações sincronizadas:', error);
+        }
     }
 
     async getLocationCount(): Promise<{ total: number; unsynced: number }> {
+        if (!this.db) {
+            await this.initialize();
+        }
+
         if (!this.db) return { total: 0, unsynced: 0 };
 
-        const totalResult = await this.db.getFirstAsync('SELECT COUNT(*) as count FROM locations');
-        const unsyncedResult = await this.db.getFirstAsync('SELECT COUNT(*) as count FROM locations WHERE synced = FALSE');
+        try {
+            const totalResult = await this.db.getFirstAsync('SELECT COUNT(*) as count FROM locations');
+            const unsyncedResult = await this.db.getFirstAsync('SELECT COUNT(*) as count FROM locations WHERE synced = FALSE');
 
-        return {
-            total: (totalResult as any)?.count || 0,
-            unsynced: (unsyncedResult as any)?.count || 0
-        };
+            return {
+                total: (totalResult as any)?.count || 0,
+                unsynced: (unsyncedResult as any)?.count || 0
+            };
+        } catch (error) {
+            console.error('❌ Erro ao contar localizações:', error);
+            return { total: 0, unsynced: 0 };
+        }
     }
 
     async isOnline(): Promise<boolean> {
-        const netInfo = await NetInfo.fetch();
-        return netInfo.isConnected === true && netInfo.isInternetReachable === true;
+        try {
+            const netInfo = await NetInfo.fetch();
+            return netInfo.isConnected === true && netInfo.isInternetReachable === true;
+        } catch (error) {
+            console.error('❌ Erro ao verificar conexão:', error);
+            return false;
+        }
+    }
+
+    isReady(): boolean {
+        return this.db !== null;
+    }
+
+    async reset(): Promise<void> {
+        try {
+            if (this.db) {
+                await this.db.closeAsync();
+            }
+        } catch (error) {
+            console.warn('⚠️ Erro ao fechar banco:', error);
+        }
+
+        this.db = null;
+        this.isInitializing = false;
+        this.initializationPromise = null;
     }
 }
 

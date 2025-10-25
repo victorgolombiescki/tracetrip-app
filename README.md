@@ -263,3 +263,8 @@ npx eas-cli build -p android --profile apk# tracetrip-app
 
 Gerar AAB
 npx eas build --profile aab --platform android --local
+
+Gerar apk
+npx eas build --profile apk --platform android --local
+
+Alterar o build.gradle a version
