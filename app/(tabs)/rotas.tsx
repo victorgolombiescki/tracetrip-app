@@ -348,7 +348,7 @@ export default function RotasScreen() {
                     disabled={settingCurrentRoute}
                   >
                     <View style={styles.currentRouteIcon}>
-                      <Map size={12} color={item.isCurrent ? "#FFFFFF" : "#1E40AF"} />
+                      <Map size={12} color={item.isCurrent ? "#FFFFFF" : "#254985"} />
                     </View>
                     <Text style={[
                       styles.currentRouteBadgeText,
@@ -385,7 +385,7 @@ export default function RotasScreen() {
   return (
     <ErrorBoundary>
       <SafeAreaView style={styles.container}>
-        <LinearGradient colors={["#1E40AF", "#1E40AF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <View style={styles.heroRow}>
             <View style={styles.heroTitleContainer}>
               <View style={styles.heroIconContainer}>
@@ -702,7 +702,7 @@ const styles = StyleSheet.create({
   },
   currentRouteBadgeActive: {
     backgroundColor: '#2563EB',
-    borderColor: '#1E40AF',
+    borderColor: '#254985',
   },
   currentRouteIcon: {
     width: 18,
@@ -828,6 +828,6 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
   emptyText: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 8 },
   emptySubtext: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 16 },
-  retryButton: { marginTop: 12, backgroundColor: '#1E40AF', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
+  retryButton: { marginTop: 12, backgroundColor: '#254985', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
   retryText: { color: 'white', fontWeight: '600', fontSize: 14 },
 });

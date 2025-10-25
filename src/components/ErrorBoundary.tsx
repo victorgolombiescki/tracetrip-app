@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1E40AF',
+    color: '#254985',
     marginBottom: 10,
   },
   message: {
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   button: {
-    backgroundColor: '#1E40AF',
+    backgroundColor: '#254985',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,

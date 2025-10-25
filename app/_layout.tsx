@@ -77,7 +77,7 @@ export default function RootLayout() {
           left: 0,
           right: 0,
           height: insets.top,
-          backgroundColor: '#1E40AF',
+          backgroundColor: '#254985',
           zIndex: 1
         }} />
         <Stack screenOptions={{ headerShown: false }}>
@@ -100,7 +100,7 @@ export default function RootLayout() {
         left: 0,
         right: 0,
         height: insets.top,
-        backgroundColor: '#1E40AF',
+        backgroundColor: '#254985',
         zIndex: 1
       }} />
       <Stack screenOptions={{ headerShown: false }}>

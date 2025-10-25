@@ -1,4 +1,4 @@
-package com.tracetrip.app
+package com.tracetrip.app.dev
 
 import android.app.Application
 import android.content.res.Configuration
