@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Wallet, ChevronRight, TrendingUp, ArrowDown, CalendarDays, Clock, Receipt, FileBarChart, Home, MapPin, LogOut, Car, Plus, Settings, BarChart3 } from 'lucide-react-native';
+import { Bell, Menu, ChevronRight, Wallet, TrendingUp, CalendarDays, Clock, MapPin, ArrowDown } from 'lucide-react-native';
 import { useAppStore } from '@/src/store/useAppStore';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -13,7 +13,7 @@ import { tryCatch } from '@/src/utils/errorHandler';
 import { TrackingButton } from '@/src/components/TrackingButton';
 import { trackingService } from '@/src/services/TrackingService';
 import NetInfo from '@react-native-community/netinfo';
-import * as TaskManager from 'expo-task-manager';
+import MenuLateral from '@/src/components/MenuLateral';
 
 export default function HomeScreen() {
   const { auth, setCurrentRoute, currentRoute, setAuth } = useAppStore();
@@ -32,6 +32,7 @@ export default function HomeScreen() {
   const [loadingCurrentRoute, setLoadingCurrentRoute] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [offlineStats, setOfflineStats] = useState<{ total: number; unsynced: number }>({ total: 0, unsynced: 0 });
+  const [menuVisible, setMenuVisible] = useState(false);
   const { width } = useWindowDimensions();
 
   useFocusEffect(
@@ -142,6 +143,20 @@ export default function HomeScreen() {
   const navigateToAgendas = () => {
     router.push('/agendas');
   };
+
+  const handleNavigate = (route: string) => {
+    switch (route) {
+      case 'gamificacao':
+        router.push('/gamificacao');
+        break;
+      case 'despesas':
+        navigateToDespesas();
+        break;
+      case 'rotas':
+        router.push('/(tabs)/rotas');
+        break;
+    }
+  };
   
   const handleLogout = () => {
     Alert.alert(
@@ -175,24 +190,24 @@ export default function HomeScreen() {
           style={styles.hero}
         >
           <View style={styles.heroTopRow}>
-            <View style={styles.heroTitleContainer}>
+            <TouchableOpacity 
+              style={styles.heroTitleContainer}
+              onPress={() => setMenuVisible(true)}
+              activeOpacity={0.7}
+            >
               <View style={styles.heroIconContainer}>
-                <Home size={24} color="#fff" />
+                <Menu size={24} color="#fff" />
               </View>
               <View style={styles.heroTexts}>
                 <Text style={styles.greeting}>{greetingTime}</Text>
                 <Text style={styles.userName}>Olá, {firstName}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
             <View style={styles.heroActions}>
               <TrackingButton />
 
               <TouchableOpacity style={styles.notificationButton}>
                 <Bell size={20} color="white" />
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.notificationButton} onPress={handleLogout}>
-                <LogOut size={18} color="white" />
               </TouchableOpacity>
 
               {auth.user?.avatarUrl ? (
@@ -429,6 +444,18 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        <MenuLateral
+          visible={menuVisible}
+          onClose={() => setMenuVisible(false)}
+          user={{
+            nome: auth.user?.nome,
+            email: auth.user?.email,
+            avatarUrl: auth.user?.avatarUrl,
+          }}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
       </SafeAreaView>
     </ErrorBoundary>
   );
