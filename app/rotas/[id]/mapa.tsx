@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert, ActivityIndicator, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Navigation } from 'lucide-react-native';
+import { ArrowLeft, Navigation, MapPin } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { WebView } from 'react-native-webview';
 import { RotasDetalhesApi, DetalhesRotaResponse } from '@/src/services/api/modules/rotas-detalhes';
@@ -26,26 +26,55 @@ export default function RotaMapaScreen() {
   };
 
   useEffect(() => {
+    console.log('[Mapa] Componente montado');
+    console.log('[Mapa] id recebido:', id);
+    console.log('[Mapa] Tipo do id:', typeof id);
+    
     if (id) {
+      console.log('[Mapa] Iniciando carregamento dos dados da rota...');
       loadRotaData();
+    } else {
+      console.warn('[Mapa] Nenhum id fornecido!');
     }
   }, [id]);
 
   const loadRotaData = async () => {
     try {
+      console.log('[Mapa] loadRotaData iniciado');
+      console.log('[Mapa] id recebido (não será usado na API):', id);
       setLoading(true);
       
-      const response = await RotasDetalhesApi.getDetalhesRota(Number(id));
+      console.log('[Mapa] Chamando API getDetalhesRota (sem id - API usa viagem atual)');
+      const response = await RotasDetalhesApi.getDetalhesRota();
+      
+      console.log('[Mapa] Resposta completa da API:', JSON.stringify(response, null, 2));
+      console.log('[Mapa] response.success:', response.success);
+      console.log('[Mapa] response.data:', response.data);
+      console.log('[Mapa] response.message:', response.message);
       
       if (response.success && response.data) {
-        setDetalhe(response.data.data);
+        // A API pode retornar {success: true, data: {data: {...}}} ou {success: true, data: {...}}
+        const detalhesData = (response.data as any).data || response.data;
+        console.log('[Mapa] Dados extraídos:', JSON.stringify(detalhesData, null, 2));
+        console.log('[Mapa] detalhesData.rota:', detalhesData?.rota);
+        console.log('[Mapa] detalhesData.enderecos:', detalhesData?.enderecos);
+        console.log('[Mapa] Quantidade de endereços:', detalhesData?.enderecos?.length || 0);
+        
+        setDetalhe(detalhesData);
+        console.log('[Mapa] Estado detalhe atualizado com sucesso');
       } else {
+        console.error('[Mapa] Resposta da API não foi bem-sucedida');
+        console.error('[Mapa] Mensagem de erro:', response.message);
         Alert.alert('Erro', response.message || 'Não foi possível carregar os dados da rota');
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar rota:', error);
+      console.error('[Mapa] ❌ Erro ao carregar rota:', error);
+      console.error('[Mapa] Tipo do erro:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('[Mapa] Mensagem do erro:', error instanceof Error ? error.message : String(error));
+      console.error('[Mapa] Stack trace:', error instanceof Error ? error.stack : 'N/A');
       Alert.alert('Erro', 'Não foi possível carregar os dados da rota');
     } finally {
+      console.log('[Mapa] Finalizando loadRotaData');
       setLoading(false);
     }
   };
@@ -73,16 +102,23 @@ export default function RotaMapaScreen() {
   };
 
   const generateMapHTML = () => {
-    let enderecosParaUsar = detalhe?.enderecos || [];
+    console.log('[Mapa] generateMapHTML chamado');
+    console.log('[Mapa] detalhe:', detalhe);
+    console.log('[Mapa] detalhe?.enderecos:', detalhe?.enderecos);
     
-
+    let enderecosParaUsar = detalhe?.enderecos || [];
+    console.log('[Mapa] enderecosParaUsar (antes do sort):', enderecosParaUsar.length, 'endereços');
     
     const sortedEnderecos = enderecosParaUsar.sort((a, b) => a.ordem - b.ordem);
+    console.log('[Mapa] sortedEnderecos:', sortedEnderecos.length, 'endereços ordenados');
     
     const coordinates = sortedEnderecos
       .filter(endereco => {
         const hasValidCoords = endereco.latitude && endereco.longitude && 
                               !isNaN(endereco.latitude) && !isNaN(endereco.longitude);
+        if (!hasValidCoords) {
+          console.warn('[Mapa] Endereço sem coordenadas válidas:', endereco);
+        }
         return hasValidCoords;
       })
       .map(endereco => ({
@@ -92,9 +128,71 @@ export default function RotaMapaScreen() {
         endereco: endereco.local?.endereco || endereco.endereco,
         ordem: endereco.ordem
       }));
+    
+    console.log('[Mapa] coordinates filtradas:', coordinates.length, 'coordenadas válidas');
+    console.log('[Mapa] coordinates:', coordinates);
 
+    if (coordinates.length === 0) {
+      console.error('[Mapa] Nenhuma coordenada válida encontrada!');
+      console.error('[Mapa] Retornando HTML com mensagem estilizada');
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Mapa da Rota</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              height: 100vh; 
+              width: 100%; 
+              display: flex; 
+              align-items: center; 
+              justify-content: center; 
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+            .empty-state {
+              text-align: center;
+              padding: 40px 20px;
+              color: white;
+            }
+            .empty-icon {
+              font-size: 80px;
+              margin-bottom: 20px;
+              opacity: 0.9;
+            }
+            .empty-title {
+              font-size: 24px;
+              font-weight: 700;
+              margin-bottom: 12px;
+              color: white;
+            }
+            .empty-message {
+              font-size: 16px;
+              opacity: 0.9;
+              line-height: 1.5;
+              max-width: 300px;
+              margin: 0 auto;
+              color: rgba(255, 255, 255, 0.95);
+            }
+          </style>
+        </head>
+        <body>
+          <div class="empty-state">
+            <div class="empty-icon">📍</div>
+            <h1 class="empty-title">Nenhum Local Vinculado</h1>
+            <p class="empty-message">Esta rota ainda não possui locais cadastrados. Adicione locais para visualizar no mapa.</p>
+          </div>
+        </body>
+        </html>
+      `;
+    }
+    
     const centerLat = coordinates.reduce((sum, coord) => sum + coord.lat, 0) / coordinates.length;
     const centerLng = coordinates.reduce((sum, coord) => sum + coord.lng, 0) / coordinates.length;
+    console.log('[Mapa] Centro do mapa calculado:', { centerLat, centerLng });
 
     const markers = coordinates.map((coord, index) => {
       const color = index === 0 ? 'green' : index === coordinates.length - 1 ? 'red' : 'blue';
@@ -150,7 +248,7 @@ export default function RotaMapaScreen() {
       `;
     }).join('\n');
 
-    return `
+    const htmlTemplate = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -163,6 +261,9 @@ export default function RotaMapaScreen() {
           #map { height: 100vh; width: 100%; }
           .custom-marker { background: transparent !important; border: none !important; }
           .leaflet-popup-content { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+          /* Esconder atribuição do Leaflet */
+          .leaflet-control-attribution { display: none !important; }
+          a[href*="leaflet"] { display: none !important; }
         </style>
       </head>
       <body>
@@ -172,7 +273,7 @@ export default function RotaMapaScreen() {
           const map = L.map('map').setView([${centerLat}, ${centerLng}], 13);
           
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+            attribution: ''
           }).addTo(map);
           
           ${markers}
@@ -199,6 +300,9 @@ export default function RotaMapaScreen() {
       </body>
       </html>
     `;
+    
+    console.log('[Mapa] HTML gerado com sucesso, tamanho:', htmlTemplate.length, 'caracteres');
+    return htmlTemplate;
   };
 
   if (loading) {
@@ -224,7 +328,7 @@ export default function RotaMapaScreen() {
   if (!detalhe) {
     return (
       <SafeAreaView style={styles.container}>
-        <LinearGradient colors={["#2563EB", "#1D4ED8"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
               <ArrowLeft size={24} color="white" />
@@ -233,10 +337,16 @@ export default function RotaMapaScreen() {
             <View style={styles.placeholder} />
           </View>
         </LinearGradient>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Nenhum dado encontrado.</Text>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Voltar</Text>
+        <View style={styles.emptyStateContainer}>
+          <View style={styles.emptyStateIcon}>
+            <MapPin size={64} color="#9CA3AF" />
+          </View>
+          <Text style={styles.emptyStateTitle}>Nenhum Dado Encontrado</Text>
+          <Text style={styles.emptyStateMessage}>
+            Não foi possível carregar os dados da rota. Verifique sua conexão e tente novamente.
+          </Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.emptyStateButton}>
+            <Text style={styles.emptyStateButtonText}>Voltar</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -275,8 +385,20 @@ export default function RotaMapaScreen() {
           javaScriptEnabled={true}
           domStorageEnabled={true}
           startInLoadingState={true}
-          onLoadStart={() => setMapLoading(true)}
-          onLoadEnd={() => setMapLoading(false)}
+          onLoadStart={() => {
+            console.log('[Mapa] WebView onLoadStart');
+            setMapLoading(true);
+          }}
+          onLoadEnd={() => {
+            console.log('[Mapa] WebView onLoadEnd');
+            setMapLoading(false);
+          }}
+          onError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.error('[Mapa] WebView erro:', nativeEvent);
+            console.error('[Mapa] Código do erro:', nativeEvent.code);
+            console.error('[Mapa] Descrição do erro:', nativeEvent.description);
+          }}
           onMessage={handleWebViewMessage}
           renderLoading={() => (
             <View style={styles.mapLoading}>
@@ -394,5 +516,48 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginTop: 16,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    backgroundColor: '#F9FAFB',
+  },
+  emptyStateIcon: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  emptyStateTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  emptyStateMessage: {
+    fontSize: 15,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 32,
+  },
+  emptyStateButton: {
+    backgroundColor: '#254985',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    minWidth: 120,
+  },
+  emptyStateButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

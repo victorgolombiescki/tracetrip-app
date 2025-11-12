@@ -16,6 +16,7 @@ export const DespesasApi = {
     status?: 'PENDENTE' | 'APROVADO' | 'REPROVADO';
     tipo?: 'ALIMENTACAO' | 'TRANSPORTE' | 'HOSPEDAGEM' | 'COMBUSTIVEL' | 'OUTROS';
     descricao?: string;
+    apenasRotaAtual?: boolean;
   }) => apiClient.getDespesas(filtros),
   create: async (payload: Omit<Despesa, 'id' | 'updatedAt'>) => apiClient.createDespesa(payload),
   createWithViagem: async (viagemId: number, despesa: any) => apiClient.createDespesaComViagem(viagemId, despesa),

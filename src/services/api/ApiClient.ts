@@ -204,6 +204,7 @@ export class ApiClient {
     status?: 'PENDENTE' | 'APROVADO' | 'REPROVADO';
     tipo?: 'ALIMENTACAO' | 'TRANSPORTE' | 'HOSPEDAGEM' | 'COMBUSTIVEL' | 'OUTROS';
     descricao?: string;
+    apenasRotaAtual?: boolean;
   }): Promise<ApiResponse<{
     items: Despesa[];
     meta: {
@@ -213,18 +214,17 @@ export class ApiClient {
       currentPage: number;
     };
   }>> {
-    if (filtros && filtros.status) {
-      const body = {
-        filtros: {
-          status: filtros.status,
-          tipo: filtros.tipo,
-          descricao: filtros.descricao || ''
-        }
-      };
-      return this.http('POST', '/app/despesas/filtros', body);
-    } else {
-      return this.http('GET', '/app/despesas');
-    }
+    // Sempre usar POST com filtros para garantir que apenasRotaAtual seja enviado
+    const body = {
+      filtros: {
+        status: filtros?.status || 'todos',
+        tipo: filtros?.tipo || 'todas',
+        descricao: filtros?.descricao || '',
+        apenasRotaAtual: filtros?.apenasRotaAtual !== undefined ? filtros.apenasRotaAtual : true
+      }
+    };
+    console.log('[ApiClient.getDespesas] Enviando filtros:', JSON.stringify(body, null, 2));
+    return this.http('POST', '/app/despesas/filtros', body);
   }
 
   async getDespesaDetalhe(id: string): Promise<ApiResponse<any>> {
@@ -380,6 +380,20 @@ export class ApiClient {
   
   async getCurrentRoute(): Promise<ApiResponse<any>> {
     return this.http('GET', `/app/rotas/current`);
+  }
+
+  async verificarVersao(appVersion: string, platform: string): Promise<ApiResponse<{
+    precisaAtualizar: boolean;
+    atualizacaoObrigatoria: boolean;
+    versaoAtual: string;
+    versaoMinima: string;
+    urlAtualizacao?: string;
+    mensagem?: string;
+  }>> {
+    return this.http('GET', `/app/versao/verificar`, undefined, {
+      'x-app-version': appVersion,
+      'x-platform': platform,
+    });
   }
 
   async get<T>(path: string): Promise<ApiResponse<T>> {

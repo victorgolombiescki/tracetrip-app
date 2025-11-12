@@ -43,6 +43,7 @@ export default function RotasScreen() {
   const lastFocusTimeRef = useRef(0);
   
   useEffect(() => {
+    console.log('[useEffect] Filter mudou para:', filter);
     retryCountRef.current = 0;
     loadRotas(true);
   }, [filter]);
@@ -50,10 +51,24 @@ export default function RotasScreen() {
   useEffect(() => {
     if (rotas.length > 0) {
       const currentRoute = rotas.find(route => route.isCurrent === true);
+      console.log('[useEffect rotas] Total de rotas:', rotas.length);
+      console.log('[useEffect rotas] Verificando rotas com isCurrent:');
+      rotas.forEach(r => {
+        console.log(`[useEffect rotas] Rota ${r.id} (${r.nome}): isCurrent=${r.isCurrent}`);
+      });
+      console.log('[useEffect rotas] Rota atual encontrada:', currentRoute?.id || 'nenhuma');
+      
       if (currentRoute) {
-        setCurrentRouteId(currentRoute.id);
-      } else if (filter === 'em_andamento' && rotas.length > 0) {
-        setCurrentRouteId(rotas[0].id);
+        console.log('[useEffect rotas] Definindo currentRouteId para:', currentRoute.id);
+        if (currentRouteId !== currentRoute.id) {
+          setCurrentRouteId(currentRoute.id);
+        }
+      } else {
+        // Se não há rota marcada como atual no backend, limpar o currentRouteId
+        console.log('[useEffect rotas] Nenhuma rota marcada como atual no backend (isCurrent=true). Limpando currentRouteId.');
+        if (currentRouteId !== null) {
+          setCurrentRouteId(null);
+        }
       }
     }
   }, [rotas, filter]);
@@ -117,11 +132,26 @@ export default function RotasScreen() {
       
       if (filter === 'em_andamento') {
         apiFilters = { status: 'todas' };
+        console.log('[loadRotas] ========== FILTRO EM_ANDAMENTO ==========');
+        console.log('[loadRotas] Filter atual:', filter);
+        console.log('[loadRotas] ApiFilters configurado:', apiFilters);
       } else {
         apiFilters = { status: filter };
       }
       
+      console.log('[loadRotas] Chamando RotasApi.list com:', { apiFilters, page: reset ? 1 : page, limit: 10 });
       const resp = await RotasApi.list(apiFilters, reset ? 1 : page, 10);
+      
+      if (filter === 'em_andamento') {
+        console.log('[loadRotas] ========== RESPOSTA COMPLETA DO BACKEND (EM_ANDAMENTO) ==========');
+        console.log('[loadRotas] Resposta (objeto):', resp);
+        console.log('[loadRotas] Resposta (JSON):', JSON.stringify(resp, null, 2));
+        console.log('[loadRotas] resp.success:', resp?.success);
+        console.log('[loadRotas] resp.data:', resp?.data);
+        console.log('[loadRotas] resp.data (JSON):', JSON.stringify(resp?.data, null, 2));
+        console.log('[loadRotas] resp.message:', resp?.message);
+        console.log('[loadRotas] ===============================================================');
+      }
       
       if (!resp || !resp.success) {
         throw new Error(resp?.message || 'Falha ao carregar rotas');
@@ -132,17 +162,40 @@ export default function RotasScreen() {
       let items: RotaItem[] = data.items || [];
       
       if (filter === 'em_andamento') {
+        console.log('[loadRotas] Items ANTES do filtro:', items.length);
+        console.log('[loadRotas] Items brutos (JSON):', JSON.stringify(items, null, 2));
+        console.log('[loadRotas] Detalhamento de cada item ANTES do filtro:');
+        items.forEach((item, index) => {
+          console.log(`[loadRotas] Item ${index + 1}:`, {
+            id: item.id,
+            nome: item.nome,
+            status: item.status,
+            finalizarViagem: item.finalizarViagem,
+            isCurrent: item.isCurrent,
+            dataInicio: item.dataInicio,
+            dataFim: item.dataFim
+          });
+        });
+      }
+      
+      if (filter === 'em_andamento') {
         items = items.filter(item => {
           if (item.status === 'em_andamento') {
+            console.log(`[loadRotas] Item ${item.id} (${item.nome}) - INCLUÍDO: status é em_andamento`);
             return true;
           }
           
           if (item.status === 'passadas' && (item.finalizarViagem === false || item.finalizarViagem === null)) {
+            console.log(`[loadRotas] Item ${item.id} (${item.nome}) - INCLUÍDO: status passadas mas finalizarViagem é ${item.finalizarViagem}`);
             return true;
           }
           
+          console.log(`[loadRotas] Item ${item.id} (${item.nome}) - EXCLUÍDO: status=${item.status}, finalizarViagem=${item.finalizarViagem}`);
           return false;
         });
+        console.log('[loadRotas] Items DEPOIS do filtro:', items.length);
+        console.log('[loadRotas] Items filtrados (JSON):', JSON.stringify(items, null, 2));
+        console.log('[loadRotas] ===============================================================');
       } else if (filter === 'passadas') {
         items = items.filter(item => 
           item.status === 'passadas' && item.finalizarViagem === true
@@ -153,6 +206,9 @@ export default function RotasScreen() {
 
       if (reset) {
         setRotas(items);
+        console.log('[loadRotas] Rotas carregadas (reset):', items.length, 'itens');
+        console.log('[loadRotas] Rotas com status em_andamento:', items.filter(r => r.status === 'em_andamento').length);
+        console.log('[loadRotas] Rotas com isCurrent=true:', items.filter(r => r.isCurrent === true).length);
       } else {
         setRotas(prev => [...prev, ...items]);
       }
@@ -216,22 +272,62 @@ export default function RotasScreen() {
   };
   
   const handleSetCurrentRoute = async (routeId: string) => {
-    if (routeId === currentRouteId || settingCurrentRoute) return;
+    console.log('[handleSetCurrentRoute] Iniciando - routeId:', routeId);
+    console.log('[handleSetCurrentRoute] currentRouteId:', currentRouteId);
+    console.log('[handleSetCurrentRoute] settingCurrentRoute:', settingCurrentRoute);
     
+    if (routeId === currentRouteId) {
+      console.log('[handleSetCurrentRoute] Abortando: rota já é a atual');
+      return;
+    }
+    
+    if (settingCurrentRoute) {
+      console.log('[handleSetCurrentRoute] Abortando: já está processando outra rota');
+      return;
+    }
+    
+    console.log('[handleSetCurrentRoute] Prosseguindo com a definição da rota');
     setSettingCurrentRoute(true);
+    
     try {
-      await RotasApi.setCurrentRoute(routeId);
+      console.log('[handleSetCurrentRoute] Chamando API setCurrentRoute com routeId:', routeId);
+      const response = await RotasApi.setCurrentRoute(routeId);
       
+      console.log('[handleSetCurrentRoute] ========== RESPOSTA COMPLETA DO BACKEND ==========');
+      console.log('[handleSetCurrentRoute] Resposta (objeto):', response);
+      console.log('[handleSetCurrentRoute] Resposta (JSON):', JSON.stringify(response, null, 2));
+      console.log('[handleSetCurrentRoute] response.success:', response.success);
+      console.log('[handleSetCurrentRoute] response.data:', response.data);
+      console.log('[handleSetCurrentRoute] response.data (JSON):', JSON.stringify(response.data, null, 2));
+      console.log('[handleSetCurrentRoute] response.message:', response.message);
+      console.log('[handleSetCurrentRoute] ===================================================');
+      
+      // Verificar se a resposta contém informações sobre qual rota foi definida como atual
+      if (response.data) {
+        console.log('[handleSetCurrentRoute] Dados retornados pelo backend:', response.data);
+        if (typeof response.data === 'object') {
+          console.log('[handleSetCurrentRoute] response.data.id:', (response.data as any).id);
+          console.log('[handleSetCurrentRoute] response.data.isCurrent:', (response.data as any).isCurrent);
+          console.log('[handleSetCurrentRoute] response.data.nome:', (response.data as any).nome);
+        }
+      }
+      
+      console.log('[handleSetCurrentRoute] Atualizando estado - currentRouteId para:', routeId);
       setCurrentRouteId(routeId);
       
+      console.log('[handleSetCurrentRoute] Atualizando lista de rotas...');
       setRotas(prev => prev.map(rota => ({
         ...rota,
         isCurrent: rota.id === routeId
       })));
       
+      console.log('[handleSetCurrentRoute] Rota atual definida com sucesso');
     } catch (error) {
+      console.error('[handleSetCurrentRoute] Erro ao definir rota atual:', error);
+      console.error('[handleSetCurrentRoute] Stack trace:', error instanceof Error ? error.stack : 'N/A');
       handleError(error, 'Erro ao definir rota atual');
     } finally {
+      console.log('[handleSetCurrentRoute] Finalizando - resetando settingCurrentRoute');
       setSettingCurrentRoute(false);
     }
   };
@@ -269,6 +365,15 @@ export default function RotasScreen() {
   const renderRota = ({ item }: { item: RotaItem }) => {
     const theme = getStatusTheme(item);
     const usadoPct = item.orcamento > 0 ? Math.min(100, Math.round((item.totalDespesas / item.orcamento) * 100)) : 0;
+
+    // Logs para debug de renderização
+    const shouldShowActions = item.status === 'em_andamento' || (item.status === 'passadas' && (item.finalizarViagem === null || item.finalizarViagem === false));
+    const shouldShowCurrentRouteBtn = filter === 'em_andamento';
+    
+    console.log(`[renderRota] item.id: ${item.id}, item.nome: ${item.nome}, item.status: ${item.status}, filter: ${filter}`);
+    console.log(`[renderRota] item.isCurrent (do backend): ${item.isCurrent}, currentRouteId (estado local): ${currentRouteId}`);
+    console.log(`[renderRota] shouldShowActions: ${shouldShowActions}, shouldShowCurrentRouteBtn: ${shouldShowCurrentRouteBtn}`);
+    console.log(`[renderRota] item.finalizarViagem: ${item.finalizarViagem}`);
 
     return (
       <TouchableOpacity 
@@ -330,10 +435,10 @@ export default function RotasScreen() {
             </View>
           </View>
           
-          {(item.status === 'em_andamento' || (item.status === 'passadas' && (item.finalizarViagem === null || item.finalizarViagem === false))) && (
+          {shouldShowActions && (
             <View style={styles.finalizeTripBtnContainer}>
               <View style={[styles.tripActionsRow, { alignItems: 'center', justifyContent: 'center' }]}>
-                {filter === 'em_andamento' && (
+                {shouldShowCurrentRouteBtn && (
                   <TouchableOpacity
                     style={[
                       styles.currentRouteBadge, 
@@ -341,8 +446,21 @@ export default function RotasScreen() {
                       { width: '80%' }
                     ]}
                     onPress={(e) => {
+                      console.log('[Botão] Clique detectado no botão "Definir como Atual"');
+                      console.log('[Botão] item.id:', item.id);
+                      console.log('[Botão] item.isCurrent:', item.isCurrent);
+                      console.log('[Botão] settingCurrentRoute:', settingCurrentRoute);
+                      console.log('[Botão] currentRouteId:', currentRouteId);
+                      
                       e.stopPropagation();
-                      handleSetCurrentRoute(item.id);
+                      console.log('[Botão] stopPropagation executado, chamando handleSetCurrentRoute...');
+                      
+                      try {
+                        handleSetCurrentRoute(item.id);
+                        console.log('[Botão] handleSetCurrentRoute chamado com sucesso');
+                      } catch (error) {
+                        console.error('[Botão] Erro ao chamar handleSetCurrentRoute:', error);
+                      }
                     }}
                     activeOpacity={0.1}
                     disabled={settingCurrentRoute}

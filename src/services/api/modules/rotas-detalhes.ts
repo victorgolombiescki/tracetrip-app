@@ -69,12 +69,12 @@ export interface DetalhesRotaResponse {
 export const RotasDetalhesApi = {
     async getDetalhesRota(): Promise<{
         success: boolean;
-        data?: DetalhesRotaResponse;
+        data?: DetalhesRotaResponse | any;
         message?: string;
     }> {
         try {
-            const response = await apiClient.get(`/app/rotas-detalhes`);
-            return response;
+            const response = await apiClient.get<DetalhesRotaResponse>(`/app/rotas-detalhes`);
+            return response as any;
         } catch (error) {
             console.error('Erro ao buscar detalhes da rota:', error);
             return {

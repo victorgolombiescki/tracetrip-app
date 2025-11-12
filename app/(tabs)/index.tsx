@@ -67,16 +67,30 @@ export default function HomeScreen() {
   const loadCurrentRoute = async () => {
     setLoadingCurrentRoute(true);
     try {
+      console.log('[loadCurrentRoute] Iniciando carregamento da rota atual...');
       const response = await RotasApi.getCurrentRoute();
+      console.log('[loadCurrentRoute] Resposta completa:', JSON.stringify(response, null, 2));
+      console.log('[loadCurrentRoute] response.success:', response.success);
+      console.log('[loadCurrentRoute] response.data:', response.data);
 
       if (response.success && response.data) {
-        setCurrentRoute(response.data);
+        // A API pode retornar {success: true, data: {data: {...}}} ou {success: true, data: {...}}
+        const routeData = response.data.data || response.data;
+        console.log('[loadCurrentRoute] routeData extraído:', JSON.stringify(routeData, null, 2));
+        console.log('[loadCurrentRoute] routeData.id:', routeData?.id);
+        console.log('[loadCurrentRoute] routeData.nome:', routeData?.nome);
+        
+        setCurrentRoute(routeData);
+        console.log('[loadCurrentRoute] Rota atual definida no store');
         loadDashboardData();
       } else {
+        console.log('[loadCurrentRoute] Resposta não foi bem-sucedida, limpando rota atual');
         setCurrentRoute(null);
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar rota atual:', error);
+      console.error('[loadCurrentRoute] ❌ Erro ao carregar rota atual:', error);
+      console.error('[loadCurrentRoute] Tipo do erro:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('[loadCurrentRoute] Mensagem do erro:', error instanceof Error ? error.message : String(error));
       setCurrentRoute(null);
     } finally {
       setLoadingCurrentRoute(false);
@@ -288,21 +302,54 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={styles.routeBanner}
                 onPress={async () => {
+                  console.log('[Botão Visualizar Rota] Clique detectado');
+                  console.log('[Botão Visualizar Rota] currentRoute:', currentRoute);
+                  console.log('[Botão Visualizar Rota] currentRoute?.data:', (currentRoute as any)?.data);
+                  console.log('[Botão Visualizar Rota] currentRoute?.data?.id:', (currentRoute as any)?.data?.id);
+                  console.log('[Botão Visualizar Rota] dashboard?.viagem:', dashboard?.viagem);
+                  
                   try {
-                    if (currentRoute && currentRoute.id) {
-                      router.push(`/rotas/${currentRoute.id}/mapa`);
+                    // currentRoute já deve estar no formato correto {id, nome, ...} após loadCurrentRoute
+                    // mas vamos verificar ambas as estruturas por segurança
+                    const routeId = (currentRoute as any)?.data?.id || currentRoute?.id;
+                    const routeName = (currentRoute as any)?.data?.nome || currentRoute?.nome || dashboard?.viagem;
+                    console.log('[Botão Visualizar Rota] routeId extraído:', routeId);
+                    console.log('[Botão Visualizar Rota] routeName extraído:', routeName);
+                    
+                    if (routeId) {
+                      const routePath = `/rotas/${routeId}/mapa` as any;
+                      console.log('[Botão Visualizar Rota] Navegando para rota atual:', routePath);
+                      router.push(routePath);
                     } else if (dashboard?.viagem) {
+                      console.log('[Botão Visualizar Rota] Buscando rotas simples...');
                       const rotasResponse = await RotasApi.getRotasSimples();
+                      console.log('[Botão Visualizar Rota] Resposta getRotasSimples:', rotasResponse);
+                      
                       if (rotasResponse.success && rotasResponse.data && rotasResponse.data.length > 0) {
-                        const primeiraRota = rotasResponse.data[0];
-                        router.push(`/rotas/${primeiraRota.id}/mapa`);
+                        // Priorizar rota com isCurrent: true
+                        const rotaAtual = rotasResponse.data.find((r: any) => r.isCurrent === true);
+                        const rotaParaUsar = rotaAtual || rotasResponse.data[0];
+                        
+                        console.log('[Botão Visualizar Rota] Rota atual encontrada (isCurrent):', rotaAtual?.id || 'nenhuma');
+                        console.log('[Botão Visualizar Rota] Rota selecionada para navegação:', rotaParaUsar.id);
+                        
+                        const routePath = `/rotas/${rotaParaUsar.id}/mapa` as any;
+                        console.log('[Botão Visualizar Rota] Navegando para rota:', routePath);
+                        router.push(routePath);
                       } else {
-                        router.push('/rotas/1/mapa');
+                        console.log('[Botão Visualizar Rota] Nenhuma rota encontrada, navegando para rota padrão: /rotas/1/mapa');
+                        router.push('/rotas/1/mapa' as any);
                       }
                     } else {
+                      console.log('[Botão Visualizar Rota] Sem rota atual nem viagem no dashboard, navegando para lista de rotas');
                       router.push('/(tabs)/rotas');
                     }
                   } catch (error) {
+                    console.error('[Botão Visualizar Rota] Erro ao processar clique:', error);
+                    console.error('[Botão Visualizar Rota] Tipo do erro:', error instanceof Error ? error.constructor.name : typeof error);
+                    console.error('[Botão Visualizar Rota] Mensagem do erro:', error instanceof Error ? error.message : String(error));
+                    console.error('[Botão Visualizar Rota] Stack trace:', error instanceof Error ? error.stack : 'N/A');
+                    console.log('[Botão Visualizar Rota] Redirecionando para lista de rotas devido ao erro');
                     router.push('/(tabs)/rotas');
                   }
                 }}
@@ -312,7 +359,7 @@ export default function HomeScreen() {
                   <MapPin size={14} color="white" />
                 </View>
                 <Text style={styles.routeBannerText}>
-                  Visualizar rota
+                  {(currentRoute as any)?.data?.nome || currentRoute?.nome || dashboard?.viagem || 'Visualizar rota'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -894,19 +941,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  routeBannerIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  routeBannerText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'white',
   },
   routeBannerLeft: {
     flexDirection: 'row',

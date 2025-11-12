@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Modal, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { Eye, Utensils, Car, Home, Fuel, Package, Receipt, CreditCard } from 'lucide-react-native';
+import { Eye, Utensils, Car, Home, Fuel, Package, Receipt, CreditCard, MapPin, Globe } from 'lucide-react-native';
 import { Card } from '@/src/components/ui/Card';
 import { DespesasApi } from '@/src/services/api/modules/despesas';
 import { Despesa } from '@/src/types';
@@ -15,6 +15,7 @@ export default function DespesasScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [filter, setFilter] = useState<'PENDENTE' | 'APROVADO' | 'REPROVADO'>('PENDENTE');
+  const [apenasRotaAtual, setApenasRotaAtual] = useState(true); // Por padrão mostra apenas rota atual
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMorePages, setHasMorePages] = useState(true);
@@ -41,8 +42,12 @@ export default function DespesasScreen() {
         setLoadingMore(true);
       }
 
-      const filtros = { status: filter as 'PENDENTE' | 'APROVADO' | 'REPROVADO' };
+      const filtros = { 
+        status: filter as 'PENDENTE' | 'APROVADO' | 'REPROVADO',
+        apenasRotaAtual: apenasRotaAtual
+      };
 
+      console.log('[DespesasScreen] Carregando despesas com filtros:', filtros);
       const response = await DespesasApi.list(filtros);
       
       if (!response || !response.success) {
@@ -77,7 +82,7 @@ export default function DespesasScreen() {
     if (!loading) {
       loadDespesas(true);
     }
-  }, [filter]);
+  }, [filter, apenasRotaAtual]);
 
   const loadMoreDespesas = () => {
     if (hasMorePages && !loadingMore && !loading) {
@@ -189,7 +194,8 @@ export default function DespesasScreen() {
         }
       }
       
-      return horaAjustada ? `${d.getDate()} ${dataFormatada.split(' ').slice(1).join(' ')}, ${horaAjustada}` : dataFormatada;
+      // Remove o weekday (primeira palavra) e mantém apenas o dia e mês
+      return horaAjustada ? `${dataFormatada.split(' ').slice(1).join(' ')}, ${horaAjustada}` : dataFormatada;
     } catch (e) {
       return isoDate;
     }
@@ -336,6 +342,46 @@ export default function DespesasScreen() {
               </TouchableOpacity>
             </View>
 
+            <View style={styles.routeFilterContainer}>
+              <TouchableOpacity 
+                style={[
+                  styles.routeFilterButton, 
+                  apenasRotaAtual && styles.routeFilterButtonActive
+                ]}
+                onPress={() => {
+                  console.log('[DespesasScreen] Alternando para: Rota Atual');
+                  setApenasRotaAtual(true);
+                }}
+              >
+                <MapPin size={14} color={apenasRotaAtual ? "#FFFFFF" : "#254985"} />
+                <Text style={[
+                  styles.routeFilterText,
+                  apenasRotaAtual && styles.routeFilterTextActive
+                ]}>
+                  Rota Atual
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[
+                  styles.routeFilterButton, 
+                  !apenasRotaAtual && styles.routeFilterButtonActive
+                ]}
+                onPress={() => {
+                  console.log('[DespesasScreen] Alternando para: Todas as Rotas');
+                  setApenasRotaAtual(false);
+                }}
+              >
+                <Globe size={14} color={!apenasRotaAtual ? "#FFFFFF" : "#254985"} />
+                <Text style={[
+                  styles.routeFilterText,
+                  !apenasRotaAtual && styles.routeFilterTextActive
+                ]}>
+                  Todas as Rotas
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             <FlatList
               data={despesas}
               renderItem={renderDespesa}
@@ -430,6 +476,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     backgroundColor: 'white',
+  },
+  routeFilterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  routeFilterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(37,73,133,0.06)',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  routeFilterButtonActive: {
+    backgroundColor: '#254985',
+    borderColor: '#254985',
+  },
+  routeFilterText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#254985',
+  },
+  routeFilterTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   filterButton: {
     paddingVertical: 8,

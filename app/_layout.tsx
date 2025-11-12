@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack, Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import Toast from 'react-native-toast-message';
@@ -11,10 +11,14 @@ import { useAppStore } from '@/src/store/useAppStore';
 import ErrorBoundary from '@/src/components/ErrorBoundary';
 import { handleError } from '@/src/utils/errorHandler';
 import { databaseInitializer } from '@/src/services/DatabaseInitializer';
+import { versionCheckService, VersaoInfo } from '@/src/services/VersionCheckService';
+import AtualizacaoScreen from './atualizacao';
 
 export default function RootLayout() {
   const { auth, setAuth } = useAppStore();
   const insets = useSafeAreaInsets();
+  const [versaoInfo, setVersaoInfo] = useState<VersaoInfo | null>(null);
+  const [verificandoVersao, setVerificandoVersao] = useState(false);
 
   useEffect(() => {
     initializeApp();
@@ -25,9 +29,31 @@ export default function RootLayout() {
       await databaseInitializer.initialize();
       
       await checkAuth();
+      
+      // Verificar versão após autenticação (se autenticado)
+      if (auth.isAuthenticated) {
+        await verificarVersao();
+      }
     } catch (error) {
       console.error('❌ Erro na inicialização do app:', error);
       handleError(error, 'Erro na inicialização', true);
+    }
+  };
+
+  const verificarVersao = async () => {
+    try {
+      setVerificandoVersao(true);
+      const info = await versionCheckService.verificarAtualizacao();
+      
+      if (info && info.precisaAtualizar) {
+        setVersaoInfo(info);
+        console.log('[RootLayout] Atualização necessária:', info);
+      }
+    } catch (error) {
+      console.error('[RootLayout] Erro ao verificar versão:', error);
+      // Não bloqueia o app se houver erro na verificação
+    } finally {
+      setVerificandoVersao(false);
     }
   };
 
@@ -49,6 +75,8 @@ export default function RootLayout() {
             isAuthenticated: true,
             isLoading: false
           });
+          // Verificar versão após autenticação bem-sucedida
+          await verificarVersao();
         } else {
           await authService.logout();
           setAuth({
@@ -76,7 +104,17 @@ export default function RootLayout() {
     handleError(error);
   };
 
-  if (auth.isLoading) {
+  // Se houver atualização obrigatória, mostrar tela de atualização
+  if (versaoInfo && versaoInfo.atualizacaoObrigatoria) {
+    return (
+      <ErrorBoundary onError={handleGlobalError}>
+        <AtualizacaoScreen versaoInfo={versaoInfo} />
+        <StatusBar style="light" />
+      </ErrorBoundary>
+    );
+  }
+
+  if (auth.isLoading || verificandoVersao) {
     return null;
   }
 
@@ -118,6 +156,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="splash" />
         <Stack.Screen name="onboard" />
+        <Stack.Screen name="atualizacao" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="nova-despesa" options={{ presentation: 'modal' }} />
         <Stack.Screen name="nova-ocorrencia" options={{ presentation: 'modal' }} />
@@ -127,6 +166,22 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="light" />
       <Toast config={toastConfig} />
+      {/* Modal de atualização opcional (não obrigatória) */}
+      {versaoInfo && !versaoInfo.atualizacaoObrigatoria && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+        }}>
+          <AtualizacaoScreen 
+            versaoInfo={versaoInfo} 
+            onClose={() => setVersaoInfo(null)}
+          />
+        </View>
+      )}
     </ErrorBoundary>
   );
 }
