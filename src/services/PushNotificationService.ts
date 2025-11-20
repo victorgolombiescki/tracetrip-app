@@ -20,9 +20,12 @@ export class PushNotificationService {
             }
 
             console.log('📱 Inicializando OneSignal...');
+            console.log(`📱 OneSignal App ID: ${ONESIGNAL_APP_ID}`);
+            console.log(`📱 App ID do Constants: ${Constants.expoConfig?.extra?.oneSignalAppId || 'não encontrado'}`);
             
             OneSignal.Debug.setLogLevel(LogLevel.Verbose);
             OneSignal.initialize(ONESIGNAL_APP_ID);
+            console.log(`✅ OneSignal.initialize() chamado com App ID: ${ONESIGNAL_APP_ID}`);
             
             OneSignal.Notifications.requestPermission(false).then((permission) => {
                 console.log('📱 Resposta de permissão:', permission);
