@@ -1,6 +1,7 @@
 import { Rota, Agenda, Despesa, Ocorrencia } from '@/src/types';
 import { Platform } from 'react-native';
 import Toast from 'react-native-toast-message';
+import Constants from 'expo-constants';
 
 export interface ApiResponse<T> {
   data: T;
@@ -11,9 +12,126 @@ export interface ApiResponse<T> {
 export class ApiClient {
   private baseURL: string;
   private token: string | null = null;
+  private lastDetectedIP: string | null = null;
 
   constructor(baseURL: string = (typeof process !== 'undefined' && (process as any).env?.EXPO_PUBLIC_API_BASE_URL) || 'https://tripapi.traceai.com.br') {
-    this.baseURL = baseURL;
+    this.baseURL = this.detectAndUpdateBaseURL(baseURL);
+    this.logBaseURL();
+  }
+
+  private detectAndUpdateBaseURL(envBaseURL: string): string {
+    const isDevelopment = __DEV__ || Constants.expoConfig?.extra?.eas?.projectId;
+    
+    if (!isDevelopment || envBaseURL.includes('https://')) {
+      return envBaseURL;
+    }
+
+    try {
+      const expoIP = this.getExpoServerIP();
+      if (expoIP) {
+        const detectedURL = `http://${expoIP}:3002`;
+        
+        if (this.lastDetectedIP && this.lastDetectedIP !== expoIP) {
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('⚠️ [ApiClient] IP MUDOU!');
+          console.log(`   IP anterior: ${this.lastDetectedIP}`);
+          console.log(`   IP atual: ${expoIP}`);
+          console.log(`   URL anterior: http://${this.lastDetectedIP}:3002`);
+          console.log(`   Nova URL: ${detectedURL}`);
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        } else if (!this.lastDetectedIP) {
+          const currentIP = this.extractIPFromURL(envBaseURL);
+          if (currentIP && currentIP !== expoIP) {
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('🔄 [ApiClient] IP detectado diferente do configurado');
+            console.log(`   IP configurado: ${currentIP}`);
+            console.log(`   IP detectado: ${expoIP}`);
+            console.log(`   Atualizando para: ${detectedURL}`);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          }
+        }
+        
+        this.lastDetectedIP = expoIP;
+        return detectedURL;
+      } else {
+        const currentIP = this.extractIPFromURL(envBaseURL);
+        if (currentIP) {
+          this.lastDetectedIP = currentIP;
+        }
+      }
+    } catch (error) {
+      console.warn('[ApiClient] Erro ao detectar IP do Expo:', error);
+    }
+
+    return envBaseURL;
+  }
+
+  private extractIPFromURL(url: string): string | null {
+    try {
+      const match = url.match(/http:\/\/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+      if (match && match[1] && this.isValidIP(match[1])) {
+        return match[1];
+      }
+    } catch (error) {
+      // Ignora erros
+    }
+    return null;
+  }
+
+  private getExpoServerIP(): string | null {
+    try {
+      if (Constants.expoConfig?.hostUri) {
+        const ip = Constants.expoConfig.hostUri.split(':')[0];
+        if (ip && this.isValidIP(ip)) {
+          return ip;
+        }
+      }
+
+      if (Constants.manifest2?.extra?.expoGo?.debuggerHost) {
+        const ip = Constants.manifest2.extra.expoGo.debuggerHost.split(':')[0];
+        if (ip && this.isValidIP(ip)) {
+          return ip;
+        }
+      }
+
+      if ((Constants.manifest as any)?.hostUri) {
+        const ip = (Constants.manifest as any).hostUri.split(':')[0];
+        if (ip && this.isValidIP(ip)) {
+          return ip;
+        }
+      }
+    } catch (error) {
+      console.warn('[ApiClient] Erro ao obter IP do Expo:', error);
+    }
+
+    return null;
+  }
+
+  private isValidIP(ip: string): boolean {
+    const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (!ipRegex.test(ip)) return false;
+    
+    const parts = ip.split('.').map(Number);
+    return parts.every(part => part >= 0 && part <= 255);
+  }
+
+  private logBaseURL(): void {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🌐 [ApiClient] Base URL configurada:');
+    console.log(`   ${this.baseURL}`);
+    if (this.lastDetectedIP) {
+      console.log(`   IP detectado: ${this.lastDetectedIP}`);
+    }
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  }
+
+  getBaseURL(): string {
+    const updatedURL = this.detectAndUpdateBaseURL(this.baseURL);
+    if (updatedURL !== this.baseURL) {
+      this.baseURL = updatedURL;
+      this.logBaseURL();
+    }
+    return this.baseURL;
   }
 
   setToken(token: string | null): void {
@@ -48,10 +166,13 @@ export class ApiClient {
     return { title: 'Erro', description: rawMessage || 'Ocorreu um erro inesperado.' };
   }
 
-  private async http<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: any, extraHeaders?: Record<string, string>): Promise<ApiResponse<T>> {
+  private async http<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH', path: string, body?: any, extraHeaders?: Record<string, string>): Promise<ApiResponse<T>> {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined as any;
     const timeoutId = controller ? setTimeout(() => controller.abort(), 15000) : undefined;
 
+    const currentBaseURL = this.getBaseURL();
+    const url = `${currentBaseURL}${path}`;
+    console.log(`[ApiClient] ${method} ${url}`, body ? { body: { ...body, senha: '***' } } : '');
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -59,18 +180,22 @@ export class ApiClient {
       };
       if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
 
-      const res = await fetch(`${this.baseURL}${path}`, {
+      const res = await fetch(url, {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
         signal: controller?.signal,
       } as any);
 
+      console.log(`[ApiClient] Response status: ${res.status} ${res.statusText}`);
       const text = await res.text();
+      
       let json: any = undefined;
       try {
         json = text ? JSON.parse(text) : undefined;
-      } catch {}
+      } catch (parseError) {
+        console.error('[ApiClient.http] Erro ao fazer parse do JSON:', parseError);
+      }
 
       if (!res.ok) {
         const friendly = this.mapFriendlyError(res.status, json?.message || res.statusText);
@@ -81,6 +206,7 @@ export class ApiClient {
       }
       return { success: true, data: json as T };
     } catch (e: any) {
+      console.error('[ApiClient.http] Exceção capturada:', e);
       const isAbort = e?.name === 'AbortError';
       const friendly = isAbort
         ? { title: 'Tempo esgotado', description: 'A conexão demorou demais. Tente novamente.' }
@@ -137,7 +263,18 @@ export class ApiClient {
     dataFim: string;
     status: string;
   }>>> {
-    return this.http('GET', '/app/rotas/simples/lista');
+    console.log('[ApiClient.getRotasSimples] Iniciando requisição para /app/rotas/simples/lista');
+    console.log('[ApiClient.getRotasSimples] Base URL:', this.getBaseURL());
+    console.log('[ApiClient.getRotasSimples] Token presente:', !!this.token);
+    const response = await this.http<Array<{
+      id: string;
+      nome: string;
+      dataInicio: string;
+      dataFim: string;
+      status: string;
+    }>>('GET', '/app/rotas/simples/lista');
+    console.log('[ApiClient.getRotasSimples] Resposta recebida:', JSON.stringify(response, null, 2));
+    return response;
   }
 
   async getRotaById(id: string): Promise<ApiResponse<any>> {
@@ -255,7 +392,7 @@ export class ApiClient {
         headers['Authorization'] = `Bearer ${this.token}`;
       }
 
-      const res = await fetch(`${this.baseURL}/app/despesas/create-inteligente`, {
+      const res = await fetch(`${this.getBaseURL()}/app/despesas/create-inteligente`, {
         method: 'POST',
         headers,
         body: formData as any,
@@ -286,7 +423,7 @@ export class ApiClient {
       };
       if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
 
-      const res = await fetch(`${this.baseURL}/app/despesas/create-inteligente`, {
+      const res = await fetch(`${this.getBaseURL()}/app/despesas/create-inteligente`, {
         method: 'POST',
         headers,
         body: formData as any,
@@ -341,7 +478,7 @@ export class ApiClient {
         headers['Authorization'] = `Bearer ${this.token}`;
       }
 
-      const res = await fetch(`${this.baseURL}/app/ocorrencias/transcrever-audio`, {
+      const res = await fetch(`${this.getBaseURL()}/app/ocorrencias/transcrever-audio`, {
         method: 'POST',
         headers,
         body: form as any,
@@ -382,6 +519,95 @@ export class ApiClient {
     return this.http('GET', `/app/rotas/current`);
   }
 
+  async getVeiculos(): Promise<ApiResponse<any[]>> {
+    return this.http('GET', '/app/frota/veiculos');
+  }
+
+  async getReservasVeiculo(filtros?: {
+    veiculoId?: number;
+    dataInicio?: string;
+    dataFim?: string;
+    status?: string;
+  }): Promise<ApiResponse<any[]>> {
+    const params = new URLSearchParams();
+    if (filtros?.veiculoId) params.append('veiculoId', String(filtros.veiculoId));
+    if (filtros?.dataInicio) params.append('dataInicio', filtros.dataInicio);
+    if (filtros?.dataFim) params.append('dataFim', filtros.dataFim);
+    if (filtros?.status) params.append('status', filtros.status);
+    const query = params.toString();
+    return this.http('GET', `/app/frota/reservas${query ? `?${query}` : ''}`);
+  }
+
+  async createReservaVeiculo(reserva: any | any[]): Promise<ApiResponse<any>> {
+    return this.http('POST', '/app/frota/reservas', reserva);
+  }
+
+  async updateReservaVeiculo(id: number, reserva: any): Promise<ApiResponse<any>> {
+    return this.http('PATCH', `/app/frota/reservas/${id}`, reserva);
+  }
+
+  async deleteReservaVeiculo(id: number, excluirGrupo?: boolean): Promise<ApiResponse<void>> {
+    const query = excluirGrupo ? '?excluirGrupo=true' : '';
+    return this.http('DELETE', `/app/frota/reservas/${id}${query}`);
+  }
+
+  async getHorariosDisponiveisVeiculo(veiculoId: number, data: string): Promise<ApiResponse<any>> {
+    return this.http('GET', `/app/frota/reservas/horarios-disponiveis?veiculoId=${veiculoId}&data=${data}`);
+  }
+
+  async getDisponibilidadeVeiculos(params: {
+    dataInicio: string;
+    dataFim: string;
+    veiculoId?: number;
+  }): Promise<ApiResponse<any[]>> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('dataInicio', params.dataInicio);
+    queryParams.append('dataFim', params.dataFim);
+    if (params.veiculoId) queryParams.append('veiculoId', String(params.veiculoId));
+    return this.http('GET', `/app/frota/reservas/disponibilidade?${queryParams.toString()}`);
+  }
+
+  async getReservasVinculadas(id: number): Promise<ApiResponse<any[]>> {
+    return this.http('GET', `/app/frota/reservas/${id}/vinculadas`);
+  }
+
+  async getPendencias(status?: string): Promise<ApiResponse<any[]>> {
+    const query = status ? `?status=${status}` : '';
+    return this.http('GET', `/pendencias${query}`);
+  }
+
+  async getPendenciasCount(): Promise<ApiResponse<{ count: number }>> {
+    return this.http('GET', `/pendencias/contar`);
+  }
+
+  async getPendenciaById(id: number): Promise<ApiResponse<any>> {
+    return this.http('GET', `/pendencias/${id}`);
+  }
+
+  async concluirPendencia(id: number): Promise<ApiResponse<any>> {
+    return this.http('POST', `/pendencias/${id}/concluir`);
+  }
+
+  async cancelarPendencia(id: number): Promise<ApiResponse<any>> {
+    return this.http('POST', `/pendencias/${id}/cancelar`);
+  }
+
+  async createHistoricoKm(veiculoId: number, data: { kmRegistrado: number; observacoes?: string }): Promise<ApiResponse<any>> {
+    return this.http('POST', `/frota/veiculos/${veiculoId}/kms`, data);
+  }
+
+  async updateReservaKmFinal(reservaId: number, kmFinal: number): Promise<ApiResponse<any>> {
+    return this.http('PATCH', `/app/frota/reservas/${reservaId}`, { kmFinal });
+  }
+
+  async registrarPushToken(token: string, plataforma: 'ios' | 'android'): Promise<ApiResponse<any>> {
+    return this.http('POST', '/push-notifications/registrar-token', { token, plataforma });
+  }
+
+  async desativarPushToken(token: string): Promise<ApiResponse<any>> {
+    return this.http('POST', '/push-notifications/desativar-token', { token });
+  }
+
   async verificarVersao(appVersion: string, platform: string): Promise<ApiResponse<{
     precisaAtualizar: boolean;
     atualizacaoObrigatoria: boolean;
@@ -398,6 +624,62 @@ export class ApiClient {
 
   async get<T>(path: string): Promise<ApiResponse<T>> {
     return this.http<T>('GET', path);
+  }
+
+  async getConfiguracoesNotificacoes(): Promise<ApiResponse<Array<{
+    tipoNotificacao: string;
+    label: string;
+    descricao: string;
+    habilitado: boolean;
+    id: number | null;
+  }>>> {
+    return this.http('GET', '/configuracoes-notificacoes');
+  }
+
+  async criarConfiguracaoNotificacao(tipoNotificacao: string, habilitado: boolean): Promise<ApiResponse<any>> {
+    return this.http('POST', '/configuracoes-notificacoes', {
+      tipoNotificacao,
+      habilitado
+    });
+  }
+
+  async atualizarConfiguracaoNotificacao(tipoNotificacao: string, habilitado: boolean): Promise<ApiResponse<any>> {
+    return this.http('PUT', `/configuracoes-notificacoes/${tipoNotificacao}`, {
+      habilitado
+    });
+  }
+
+  async getNotificacoes(status?: string, limite?: number, offset?: number): Promise<ApiResponse<{
+    notificacoes: Array<{
+      id: number;
+      tipo: string;
+      titulo: string;
+      mensagem: string;
+      status: string;
+      createdAt: string;
+      viagemId?: number;
+      dadosAdicionais?: any;
+    }>;
+    total: number;
+  }>> {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (limite) params.append('limite', limite.toString());
+    if (offset) params.append('offset', offset.toString());
+    const query = params.toString();
+    return this.http('GET', `/app/notificacoes${query ? `?${query}` : ''}`);
+  }
+
+  async contarNotificacoesNaoLidas(): Promise<ApiResponse<{ count: number }>> {
+    return this.http('GET', '/app/notificacoes/nao-lidas/count');
+  }
+
+  async marcarNotificacaoComoLida(id: number): Promise<ApiResponse<{ sucesso: boolean }>> {
+    return this.http('PUT', `/app/notificacoes/${id}/marcar-lida`);
+  }
+
+  async marcarTodasNotificacoesComoLidas(): Promise<ApiResponse<{ quantidade: number }>> {
+    return this.http('PUT', '/app/notificacoes/marcar-todas-lidas');
   }
 }
 

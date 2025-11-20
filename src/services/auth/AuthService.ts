@@ -32,6 +32,13 @@ export class AuthService {
       await secureStorage.setItemAsync(TOKEN_KEY, token);
       await secureStorage.setItemAsync(USER_KEY, JSON.stringify(user));
 
+      const { PushNotificationService } = await import('@/src/services/PushNotificationService');
+      setTimeout(() => {
+        PushNotificationService.tentarRegistrarTokenNovamente().catch(err => {
+          console.error('Erro ao registrar token push após login (não bloqueante):', err);
+        });
+      }, 1000);
+
       return { user, token };
     } catch (error) {
       console.error('Login failed:', error);

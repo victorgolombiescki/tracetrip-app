@@ -417,24 +417,21 @@ export default function NovaOcorrenciaScreen() {
                   >
                     <View style={styles.optionContent}>
                       <View style={styles.optionTextContainer}>
-                        <Text style={[
-                          styles.optionText,
-                          rota.isCurrent && styles.optionTextCurrent
-                        ]}>
-                          {rota.nome}
-                        </Text>
-                        {rota.isCurrent && (
-                          <View style={styles.currentBadge}>
-                            <Text style={styles.currentBadgeText}>Atual</Text>
-                          </View>
-                        )}
-                      </View>
-                      <View style={styles.optionDetails}>
-                        <Text style={styles.optionStatus}>
-                          Status: {rota.status === 'em_andamento' ? 'Em Andamento' : 'Concluída'}
-                        </Text>
+                        <View style={styles.optionTitleRow}>
+                          <Text style={[
+                            styles.optionText,
+                            rota.isCurrent && styles.optionTextCurrent
+                          ]}>
+                            {rota.nome}
+                          </Text>
+                          {rota.isCurrent && (
+                            <View style={styles.currentBadge}>
+                              <Text style={styles.currentBadgeText}>Atual</Text>
+                            </View>
+                          )}
+                        </View>
                         <Text style={styles.optionDate}>
-                          {rota.dataInicio ? new Date(rota.dataInicio).toLocaleDateString('pt-BR') : 'Data não definida'}
+                          {new Date(rota.dataInicio).toLocaleDateString('pt-BR')} - {new Date(rota.dataFim).toLocaleDateString('pt-BR')}
                         </Text>
                       </View>
                     </View>
@@ -555,18 +552,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  optionDetails: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-  },
-  optionStatus: {
-    fontSize: 11,
-    color: '#64748B',
-    marginBottom: 2,
-  },
   optionDate: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#94A3B8',
+    marginTop: 2,
   },
   noRotasContainer: {
     alignItems: 'center',
@@ -663,10 +652,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   optionTextContainer: {
+    flexDirection: 'column',
     flex: 1,
+  },
+  optionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   optionTextCurrent: {
     color: '#2563EB',

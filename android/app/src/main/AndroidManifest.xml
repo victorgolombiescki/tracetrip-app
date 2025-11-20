@@ -36,6 +36,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="tracetrip"/>
+        <data android:scheme="exp+trace-trip"/>
       </intent-filter>
       <intent-filter data-generated="true">
         <action android:name="android.intent.action.android.intent.action.MAIN"/>

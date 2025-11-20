@@ -9,7 +9,8 @@ import {
   MapPin, 
   Plus, 
   Microphone, 
-  CaretRight 
+  CaretRight,
+  Car
 } from 'phosphor-react-native';
 
 export default function TabLayout() {
@@ -109,6 +110,12 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="agenda-frota"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
           name="rotas"
           options={{
             title: 'Rotas',
@@ -158,6 +165,26 @@ export default function TabLayout() {
                 <View style={styles.actionTexts}>
                   <Text style={styles.actionTitle}>Ocorrência</Text>
                   <Text style={styles.actionSubtitle}>Registrar ocorrência</Text>
+                </View>
+              </View>
+              <CaretRight size={18} color="#9CA3AF" weight="bold" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionRow}
+              onPress={() => {
+                setFabOpen(false);
+                router.push('/nova-reserva');
+              }}
+              accessibilityLabel="Nova reserva"
+            >
+              <View style={styles.actionLeft}>
+                <View style={styles.actionIconWrap}>
+                  <Car size={20} color="#254985" weight="duotone" />
+                </View>
+                <View style={styles.actionTexts}>
+                  <Text style={styles.actionTitle}>Nova Reserva</Text>
+                  <Text style={styles.actionSubtitle}>Reservar veículo</Text>
                 </View>
               </View>
               <CaretRight size={18} color="#9CA3AF" weight="bold" />

@@ -28,11 +28,6 @@ export default function LoginScreen() {
   const { auth, setAuth } = useAppStore();
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    if (auth.isAuthenticated) {
-      router.replace('/(tabs)');
-    }
-  }, [auth.isAuthenticated]);
 
   const { control, handleSubmit, formState: { errors }, watch } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -47,10 +42,13 @@ export default function LoginScreen() {
   const onSubmit = async (data: LoginForm) => {
     try {
       setLoading(true);
+      console.log('🔐 Tentando fazer login com:', data.email);
       const result = await authService.login(data.email, data.senha);
+      console.log('✅ Login bem-sucedido');
       setAuth({ user: result.user, token: result.token, isAuthenticated: true, isLoading: false });
       router.replace('/(tabs)');
     } catch (error: any) {
+      console.error('❌ Erro no login:', error);
       if (error.code === 'NETWORK_ERROR' || error.message?.includes('network') || error.message?.includes('fetch')) {
         Toast.show({
           type: 'error',

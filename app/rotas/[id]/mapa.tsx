@@ -40,25 +40,16 @@ export default function RotaMapaScreen() {
 
   const loadRotaData = async () => {
     try {
-      console.log('[Mapa] loadRotaData iniciado');
-      console.log('[Mapa] id recebido (não será usado na API):', id);
+
       setLoading(true);
       
-      console.log('[Mapa] Chamando API getDetalhesRota (sem id - API usa viagem atual)');
       const response = await RotasDetalhesApi.getDetalhesRota();
       
-      console.log('[Mapa] Resposta completa da API:', JSON.stringify(response, null, 2));
-      console.log('[Mapa] response.success:', response.success);
-      console.log('[Mapa] response.data:', response.data);
-      console.log('[Mapa] response.message:', response.message);
       
       if (response.success && response.data) {
         // A API pode retornar {success: true, data: {data: {...}}} ou {success: true, data: {...}}
         const detalhesData = (response.data as any).data || response.data;
-        console.log('[Mapa] Dados extraídos:', JSON.stringify(detalhesData, null, 2));
-        console.log('[Mapa] detalhesData.rota:', detalhesData?.rota);
-        console.log('[Mapa] detalhesData.enderecos:', detalhesData?.enderecos);
-        console.log('[Mapa] Quantidade de endereços:', detalhesData?.enderecos?.length || 0);
+  
         
         setDetalhe(detalhesData);
         console.log('[Mapa] Estado detalhe atualizado com sucesso');

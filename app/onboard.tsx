@@ -17,7 +17,7 @@ export default function OnboardScreen() {
   }, [auth.isAuthenticated]);
   
   const handleLogin = () => {
-    router.replace('/login');
+    router.push('/login');
   };
   
   if (auth.isLoading || auth.isAuthenticated) {

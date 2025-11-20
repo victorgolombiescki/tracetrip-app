@@ -97,12 +97,12 @@ export default function NovaDespesaScreen() {
   const loadRotas = async () => {
     try {
       const response = await RotasApi.getRotasSimples();
+      
       if (response.success) {
         const rotas = (response.data || []) as RotaSimples[];
+
         
-        const activeRotas = rotas.filter((rota) => 
-          rota.status === 'em_andamento' || rota.status === 'concluida' || rota.status === 'ativa' || rota.status === 'passada'
-        );
+        const activeRotas = rotas;
         
         setRotas(activeRotas);
         
@@ -116,6 +116,11 @@ export default function NovaDespesaScreen() {
         }
       }
     } catch (e) {
+      console.error('[NovaDespesa] Erro ao carregar rotas:', e);
+      if (e instanceof Error) {
+        console.error('[NovaDespesa] Mensagem de erro:', e.message);
+        console.error('[NovaDespesa] Stack trace:', e.stack);
+      }
     }
   };
 
@@ -575,21 +580,21 @@ export default function NovaDespesaScreen() {
                   >
                     <View style={styles.optionContent}>
                       <View style={styles.optionTextContainer}>
-                        <Text style={[
-                          styles.optionText,
-                          rota.isCurrent && styles.optionTextCurrent
-                        ]}>
-                          {rota.nome}
-                        </Text>
-                        {rota.isCurrent && (
-                          <View style={styles.currentBadge}>
-                            <Text style={styles.currentBadgeText}>Atual</Text>
-                          </View>
-                        )}
-                      </View>
-                      <View style={styles.optionDetails}>
-                        <Text style={styles.optionStatus}>
-                          Status: {rota.status === 'em_andamento' || rota.status === 'ativa' ? 'Em Andamento' : 'Concluída'}
+                        <View style={styles.optionTitleRow}>
+                          <Text style={[
+                            styles.optionText,
+                            rota.isCurrent && styles.optionTextCurrent
+                          ]}>
+                            {rota.nome}
+                          </Text>
+                          {rota.isCurrent && (
+                            <View style={styles.currentBadge}>
+                              <Text style={styles.currentBadgeText}>Atual</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.optionDate}>
+                          {new Date(rota.dataInicio).toLocaleDateString('pt-BR')} - {new Date(rota.dataFim).toLocaleDateString('pt-BR')}
                         </Text>
                       </View>
                     </View>
@@ -777,7 +782,10 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   optionTextContainer: {
+    flexDirection: 'column',
     flex: 1,
+  },
+  optionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -818,8 +826,9 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'flex-end',
   },
-  optionStatus: {
-    fontSize: 11,
-    color: '#64748B',
+  optionDate: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 2,
   },
 });

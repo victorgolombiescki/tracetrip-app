@@ -12,6 +12,7 @@ import {
   Trophy,
   LogOut,
   X,
+  ClipboardList,
 } from 'lucide-react-native';
 
 interface MenuLateralProps {
@@ -129,6 +130,21 @@ export default function MenuLateral({
 
             {/* Menu Items */}
             <View style={styles.menuContent}>
+              {/* Tarefas */}
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  onNavigate('tarefas');
+                  onClose();
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
+                  <ClipboardList size={20} color="#F59E0B" strokeWidth={2} />
+                </View>
+                <Text style={styles.menuItemTitle}>Tarefas</Text>
+              </TouchableOpacity>
+
               {/* Meu Perfil */}
               <TouchableOpacity
                 style={styles.menuItem}

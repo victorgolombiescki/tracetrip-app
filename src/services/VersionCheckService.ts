@@ -45,16 +45,8 @@ class VersionCheckService {
         try {
             const appVersion = this.getCurrentVersion();
             const platform = this.getPlatform();
-
-            console.log('[VersionCheck] 🔄 Verificando atualização...');
-            console.log('[VersionCheck] 📱 Versão do app:', appVersion);
-            console.log('[VersionCheck] 📱 Plataforma:', platform);
-            console.log('[VersionCheck] 📤 Enviando para backend...');
-
             const response = await apiClient.verificarVersao(appVersion, platform);
             
-            console.log('[VersionCheck] 📥 Resposta do backend:', JSON.stringify(response, null, 2));
-
             if (response.success && response.data) {
                 console.log('[VersionCheck] Resposta da verificação:', response.data);
                 return response.data;

@@ -33,12 +33,14 @@ export default function HomeScreen() {
   const [isOnline, setIsOnline] = useState(true);
   const [offlineStats, setOfflineStats] = useState<{ total: number; unsynced: number }>({ total: 0, unsynced: 0 });
   const [menuVisible, setMenuVisible] = useState(false);
+  const [notificacoesNaoLidas, setNotificacoesNaoLidas] = useState(0);
   const { width } = useWindowDimensions();
 
   useFocusEffect(
     React.useCallback(() => {
       loadDashboardData();
       loadCurrentRoute();
+      loadNotificacoesNaoLidas();
       
       trackingService.restoreTrackingIfEnabled();
       
@@ -56,35 +58,43 @@ export default function HomeScreen() {
       };
       loadStats();
       intervalId = setInterval(loadStats, 15000);
+
+      const notifIntervalId = setInterval(() => {
+        loadNotificacoesNaoLidas();
+      }, 30000);
       
       return () => { 
         try { unsubscribe(); } catch {}
         try { if (intervalId) clearInterval(intervalId); } catch {}
+        try { if (notifIntervalId) clearInterval(notifIntervalId); } catch {}
       };
     }, [])
   );
 
+  const loadNotificacoesNaoLidas = async () => {
+    try {
+      const response = await apiClient.contarNotificacoesNaoLidas();
+      if (response.success && response.data) {
+        setNotificacoesNaoLidas(response.data.count || 0);
+      }
+    } catch (error) {
+      // Ignora erros silenciosamente
+    }
+  };
+
   const loadCurrentRoute = async () => {
     setLoadingCurrentRoute(true);
     try {
-      console.log('[loadCurrentRoute] Iniciando carregamento da rota atual...');
       const response = await RotasApi.getCurrentRoute();
-      console.log('[loadCurrentRoute] Resposta completa:', JSON.stringify(response, null, 2));
-      console.log('[loadCurrentRoute] response.success:', response.success);
-      console.log('[loadCurrentRoute] response.data:', response.data);
+
 
       if (response.success && response.data) {
         // A API pode retornar {success: true, data: {data: {...}}} ou {success: true, data: {...}}
         const routeData = response.data.data || response.data;
-        console.log('[loadCurrentRoute] routeData extraído:', JSON.stringify(routeData, null, 2));
-        console.log('[loadCurrentRoute] routeData.id:', routeData?.id);
-        console.log('[loadCurrentRoute] routeData.nome:', routeData?.nome);
         
         setCurrentRoute(routeData);
-        console.log('[loadCurrentRoute] Rota atual definida no store');
         loadDashboardData();
       } else {
-        console.log('[loadCurrentRoute] Resposta não foi bem-sucedida, limpando rota atual');
         setCurrentRoute(null);
       }
     } catch (error) {
@@ -163,11 +173,17 @@ export default function HomeScreen() {
       case 'gamificacao':
         router.push('/gamificacao');
         break;
+      case 'tarefas':
+        router.push('/tarefas');
+        break;
       case 'despesas':
         navigateToDespesas();
         break;
       case 'rotas':
         router.push('/(tabs)/rotas');
+        break;
+      case 'notificacoes':
+        router.push('/notificacoes');
         break;
     }
   };
@@ -220,8 +236,19 @@ export default function HomeScreen() {
             <View style={styles.heroActions}>
               <TrackingButton />
 
-              <TouchableOpacity style={styles.notificationButton}>
+              <TouchableOpacity 
+                style={styles.notificationButton}
+                onPress={() => router.push('/notificacoes')}
+                activeOpacity={0.7}
+              >
                 <Bell size={20} color="white" />
+                {notificacoesNaoLidas > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {notificacoesNaoLidas > 99 ? '99+' : notificacoesNaoLidas}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
 
               {auth.user?.avatarUrl ? (
@@ -816,6 +843,26 @@ const styles = StyleSheet.create({
     padding: 7,
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 10,
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#254985',
+  },
+  notificationBadgeText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '700',
   },
   avatarImg: {
     width: 36,

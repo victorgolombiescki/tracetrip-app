@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Dimensions, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar as CalendarIcon, Clock, MapPin, CheckSquare, X } from 'lucide-react-native';
 import { Card } from '@/src/components/ui/Card';
@@ -40,6 +40,8 @@ export default function AgendasScreen() {
   const navigatingToListRef = useRef(false);
   const [visibleDays, setVisibleDays] = useState<string[]>([]);
   const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
+  const [modalTipoAgenda, setModalTipoAgenda] = useState(true);
+  const [tipoAgendaSelecionado, setTipoAgendaSelecionado] = useState<'compromissos' | 'frota' | null>(null);
   
   const loadCurrentMonth = () => {
     const today = new Date();
@@ -79,9 +81,7 @@ export default function AgendasScreen() {
   
   useFocusEffect(
     React.useCallback(() => {
-      setViewMode('lista');
-      
-      loadCurrentMonth();
+      setModalTipoAgenda(true);
     }, [])
   );
 
@@ -399,7 +399,7 @@ export default function AgendasScreen() {
           </View>
         </LinearGradient>
 
-        {viewMode === 'calendario' ? (
+        {tipoAgendaSelecionado === 'compromissos' && (viewMode === 'calendario' ? (
           <View style={styles.calendarContainer}>
             <View style={styles.calendarCard}>
               <Calendar
@@ -577,7 +577,50 @@ export default function AgendasScreen() {
               />
             )}
           </>
-        )}
+        ))}
+
+        <Modal visible={modalTipoAgenda} transparent animationType="fade">
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Selecione o tipo de agenda</Text>
+              
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => {
+                  setTipoAgendaSelecionado('compromissos');
+                  setModalTipoAgenda(false);
+                  setViewMode('lista');
+                  loadCurrentMonth();
+                }}
+              >
+                <View style={styles.modalOptionIcon}>
+                  <CalendarIcon size={24} color="#254985" />
+                </View>
+                <View style={styles.modalOptionContent}>
+                  <Text style={styles.modalOptionTitle}>Agenda de Compromissos</Text>
+                  <Text style={styles.modalOptionSubtitle}>Visualize e gerencie seus compromissos</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => {
+                  setTipoAgendaSelecionado('frota');
+                  setModalTipoAgenda(false);
+                  router.push('/(tabs)/agenda-frota');
+                }}
+              >
+                <View style={styles.modalOptionIcon}>
+                  <MapPin size={24} color="#254985" />
+                </View>
+                <View style={styles.modalOptionContent}>
+                  <Text style={styles.modalOptionTitle}>Agenda de Frota</Text>
+                  <Text style={styles.modalOptionSubtitle}>Gerencie reservas de veículos</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </ErrorBoundary>
   );
@@ -935,5 +978,57 @@ const styles = StyleSheet.create({
     fontSize: 13, 
     color: '#6B7280', 
     textAlign: 'center' 
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    width: '85%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333333',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#F5F9FF',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  modalOptionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(37, 73, 133, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  modalOptionContent: {
+    flex: 1,
+  },
+  modalOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 4,
+  },
+  modalOptionSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
   },
 });
