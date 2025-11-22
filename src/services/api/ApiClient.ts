@@ -584,15 +584,19 @@ export class ApiClient {
     return this.http('GET', `/pendencias/${id}`);
   }
 
-  async concluirPendencia(id: number): Promise<ApiResponse<any>> {
-    return this.http('POST', `/pendencias/${id}/concluir`);
+  async concluirPendencia(id: number, atualizarDataHoraFim?: boolean): Promise<ApiResponse<any>> {
+    return this.http('POST', `/pendencias/${id}/concluir`, { atualizarDataHoraFim });
   }
 
   async cancelarPendencia(id: number): Promise<ApiResponse<any>> {
     return this.http('POST', `/pendencias/${id}/cancelar`);
   }
 
-  async createHistoricoKm(veiculoId: number, data: { kmRegistrado: number; observacoes?: string }): Promise<ApiResponse<any>> {
+  async getHistoricosKm(veiculoId: number): Promise<ApiResponse<any>> {
+    return this.http('GET', `/frota/veiculos/${veiculoId}/kms`);
+  }
+
+  async createHistoricoKm(veiculoId: number, data: { kmRegistrado: number; observacoes?: string; fotoOdometro?: string }): Promise<ApiResponse<any>> {
     return this.http('POST', `/frota/veiculos/${veiculoId}/kms`, data);
   }
 
@@ -600,12 +604,111 @@ export class ApiClient {
     return this.http('PATCH', `/app/frota/reservas/${reservaId}`, { kmFinal });
   }
 
-  async registrarPushToken(token: string, plataforma: 'ios' | 'android'): Promise<ApiResponse<any>> {
-    return this.http('POST', '/push-notifications/registrar-token', { token, plataforma });
+  async processarOcrKm(formData: FormData): Promise<ApiResponse<any>> {
+    try {
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+
+      const res = await fetch(`${this.getBaseURL()}/app/frota/ocr-km`, {
+        method: 'POST',
+        headers,
+        body: formData as any,
+      });
+
+      const text = await res.text();
+      const json = text ? JSON.parse(text) : undefined;
+
+      if (!res.ok) {
+        const friendly = this.mapFriendlyError(res.status, json?.message || res.statusText);
+        this.showErrorToast(friendly.title, friendly.description);
+        return { success: false, data: json as any, message: json?.message || res.statusText };
+      }
+      return { success: true, data: json as any };
+    } catch (e: any) {
+      const friendly = this.mapFriendlyError(undefined, e?.message);
+      this.showErrorToast(friendly.title, friendly.description);
+      return { success: false, data: undefined as any, message: e?.message || 'Network error' };
+    }
+  }
+
+  async uploadFotoReserva(reservaId: number, formData: FormData): Promise<ApiResponse<any>> {
+    try {
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+
+      const res = await fetch(`${this.getBaseURL()}/app/frota/reservas/${reservaId}/fotos`, {
+        method: 'POST',
+        headers,
+        body: formData as any,
+      });
+
+      const text = await res.text();
+      const json = text ? JSON.parse(text) : undefined;
+
+      if (!res.ok) {
+        const friendly = this.mapFriendlyError(res.status, json?.message || res.statusText);
+        this.showErrorToast(friendly.title, friendly.description);
+        return { success: false, data: json as any, message: json?.message || res.statusText };
+      }
+      return { success: true, data: json as any };
+    } catch (e: any) {
+      const friendly = this.mapFriendlyError(undefined, e?.message);
+      this.showErrorToast(friendly.title, friendly.description);
+      return { success: false, data: undefined as any, message: e?.message || 'Network error' };
+    }
+  }
+
+  async atualizarObservacoesReserva(reservaId: number, observacoes: string): Promise<ApiResponse<any>> {
+    return this.http('PATCH', `/app/frota/reservas/${reservaId}/observacoes`, { observacoes });
+  }
+
+  async uploadFotoOdometro(veiculoId: number, formData: FormData): Promise<ApiResponse<any>> {
+    try {
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+
+      const res = await fetch(`${this.getBaseURL()}/app/frota/veiculos/${veiculoId}/foto-odometro`, {
+        method: 'POST',
+        headers,
+        body: formData as any,
+      });
+
+      const text = await res.text();
+      const json = text ? JSON.parse(text) : undefined;
+
+      if (!res.ok) {
+        const friendly = this.mapFriendlyError(res.status, json?.message || res.statusText);
+        this.showErrorToast(friendly.title, friendly.description);
+        return { success: false, data: json as any, message: json?.message || res.statusText };
+      }
+      return { success: true, data: json as any };
+    } catch (e: any) {
+      const friendly = this.mapFriendlyError(undefined, e?.message);
+      this.showErrorToast(friendly.title, friendly.description);
+      return { success: false, data: undefined as any, message: e?.message || 'Network error' };
+    }
+  }
+
+  async registrarPushToken(token: string, plataforma: 'ios' | 'android', playerId?: string): Promise<ApiResponse<any>> {
+    return this.http('POST', '/push-notifications/registrar-token', { token, plataforma, playerId });
   }
 
   async desativarPushToken(token: string): Promise<ApiResponse<any>> {
     return this.http('POST', '/push-notifications/desativar-token', { token });
+  }
+
+  async limparTodosTokensPush(): Promise<ApiResponse<any>> {
+    return this.http('POST', '/push-notifications/limpar-tokens', {});
+  }
+
+  async associarExternalUserId(playerId: string): Promise<ApiResponse<any>> {
+    return this.http('POST', '/push-notifications/associar-external-user-id', { playerId });
   }
 
   async verificarVersao(appVersion: string, platform: string): Promise<ApiResponse<{

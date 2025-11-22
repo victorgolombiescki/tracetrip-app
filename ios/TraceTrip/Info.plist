@@ -56,11 +56,11 @@
     <key>NSFaceIDUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Este aplicativo precisa acessar sua localização para rastreamento de viagem.</string>
+    <string>O TraceTrip precisa da sua localização mesmo com o app fechado para rastrear sua rota de viagem.</string>
     <key>NSLocationAlwaysUsageDescription</key>
-    <string>Este aplicativo precisa acessar sua localização em background para rastreamento contínuo.</string>
+    <string>O TraceTrip precisa da sua localização em background para rastreamento contínuo da sua rota de viagem.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Este aplicativo precisa acessar sua localização para rastreamento de viagem.</string>
+    <string>O TraceTrip precisa da sua localização para rastreamento de viagem.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSPhotoLibraryUsageDescription</key>
@@ -71,9 +71,9 @@
     </array>
     <key>UIBackgroundModes</key>
     <array>
-      <string>fetch</string>
       <string>remote-notification</string>
       <string>location</string>
+      <string>fetch</string>
     </array>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>

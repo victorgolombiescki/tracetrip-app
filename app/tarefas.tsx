@@ -9,6 +9,8 @@ import {
   TextInput,
   Modal,
   Alert,
+  Image,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,11 +21,14 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  Camera,
+  Upload,
 } from 'lucide-react-native';
 import { PendenciasApi, Pendencia } from '@/src/services/api/modules/pendencias';
 import { apiClient } from '@/src/services/api/ApiClient';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function TarefasScreen() {
   const router = useRouter();
@@ -34,6 +39,13 @@ export default function TarefasScreen() {
   const [pendenciaSelecionada, setPendenciaSelecionada] = useState<Pendencia | null>(null);
   const [kmValue, setKmValue] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ultimoKm, setUltimoKm] = useState<number | null>(null);
+  const [carregandoUltimoKm, setCarregandoUltimoKm] = useState(false);
+  const [fotosCarro, setFotosCarro] = useState<Array<{ uri: string; key?: string }>>([]);
+  const [uploadingFotos, setUploadingFotos] = useState(false);
+  const [observacoes, setObservacoes] = useState('');
 
   useEffect(() => {
     loadPendencias();
@@ -56,10 +68,180 @@ export default function TarefasScreen() {
     }
   };
 
-  const handleRegistrarKm = (pendencia: Pendencia) => {
+  const handleRegistrarKm = async (pendencia: Pendencia) => {
     setPendenciaSelecionada(pendencia);
     setKmValue('');
+    setImageUri(null);
+    setOcrLoading(false);
+    setUltimoKm(null);
+    setFotosCarro([]);
+    setObservacoes('');
+    setCarregandoUltimoKm(true);
     setModalVisible(true);
+
+    try {
+      const veiculoId = pendencia.dadosAdicionais?.veiculoId || 
+                       pendencia.reservaVeiculo?.veiculoId;
+
+      if (veiculoId) {
+        const historicosResponse = await apiClient.getHistoricosKm(veiculoId);
+        const historicos = historicosResponse.success && historicosResponse.data ? historicosResponse.data : [];
+        
+        if (historicos.length > 0) {
+          const historicosOrdenadosPorKm = [...historicos].sort((a: any, b: any) => 
+            parseFloat(b.kmRegistrado) - parseFloat(a.kmRegistrado)
+          );
+          setUltimoKm(parseFloat(historicosOrdenadosPorKm[0].kmRegistrado));
+        } else {
+          const kmInicial = (pendencia.dadosAdicionais as any)?.kmInicial || 
+                           (pendencia.reservaVeiculo?.veiculo as any)?.kmInicial || 
+                           (pendencia.reservaVeiculo?.veiculo as any)?.kmAtual || 0;
+          setUltimoKm(typeof kmInicial === 'number' ? kmInicial : parseFloat(String(kmInicial || 0)));
+        }
+      }
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Erro',
+        text2: 'Não foi possível carregar o último KM',
+      });
+    } finally {
+      setCarregandoUltimoKm(false);
+    }
+  };
+
+  const processarOcrDaImagem = async (uri: string) => {
+    try {
+      setOcrLoading(true);
+      setImageUri(uri);
+
+      const formData = new FormData();
+      const filename = uri.split('/').pop() || 'foto.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      formData.append('file', {
+        uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+        name: filename,
+        type,
+      } as any);
+
+      const response = await apiClient.processarOcrKm(formData);
+
+      if (response.success && response.data?.km) {
+        setKmValue(response.data.km.toString());
+        Toast.show({
+          type: 'success',
+          text1: 'KM extraído',
+          text2: `KM detectado: ${response.data.km.toLocaleString('pt-BR')}`,
+        });
+      } else {
+        Toast.show({
+          type: 'info',
+          text1: 'KM não encontrado',
+          text2: 'Digite o KM manualmente',
+        });
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Erro ao processar',
+        text2: 'Não foi possível extrair o KM. Digite manualmente.',
+      });
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const handleTirarFoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Precisamos de permissão para acessar a câmera');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await processarOcrDaImagem(result.assets[0].uri);
+      }
+    } catch (error: any) {
+      Alert.alert('Erro', 'Não foi possível abrir a câmera');
+    }
+  };
+
+  const handleSelecionarFoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Precisamos de permissão para acessar a galeria');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await processarOcrDaImagem(result.assets[0].uri);
+      }
+    } catch (error: any) {
+      Alert.alert('Erro', 'Não foi possível abrir a galeria');
+    }
+  };
+
+  const handleAdicionarFotoCarro = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Precisamos de permissão para acessar suas fotos');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setFotosCarro([...fotosCarro, { uri: result.assets[0].uri }]);
+      }
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível selecionar a foto');
+    }
+  };
+
+  const handleTirarFotoCarro = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Precisamos de permissão para acessar a câmera');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setFotosCarro([...fotosCarro, { uri: result.assets[0].uri }]);
+      }
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível tirar a foto');
+    }
+  };
+
+  const handleRemoverFotoCarro = (index: number) => {
+    setFotosCarro(fotosCarro.filter((_, i) => i !== index));
   };
 
   const handleSalvarKm = async () => {
@@ -73,6 +255,7 @@ export default function TarefasScreen() {
 
     try {
       setSalvando(true);
+      setUploadingFotos(true);
 
       const veiculoId = pendenciaSelecionada.dadosAdicionais?.veiculoId || 
                        pendenciaSelecionada.reservaVeiculo?.veiculoId;
@@ -81,31 +264,123 @@ export default function TarefasScreen() {
         throw new Error('ID do veículo não encontrado');
       }
 
-      await apiClient.createHistoricoKm(veiculoId, {
-        kmRegistrado: km,
-        observacoes: `Registrado via pendência - Reserva #${pendenciaSelecionada.reservaVeiculoId}`
-      });
-
-      if (pendenciaSelecionada.reservaVeiculoId) {
-        await apiClient.updateReservaKmFinal(pendenciaSelecionada.reservaVeiculoId, km);
+      if (ultimoKm !== null && km < ultimoKm) {
+        Alert.alert(
+          'Erro',
+          `KM registrado não pode ser menor que o último KM registrado (${ultimoKm.toLocaleString('pt-BR')})`
+        );
+        setSalvando(false);
+        setUploadingFotos(false);
+        return;
       }
 
-      await PendenciasApi.concluirPendencia(pendenciaSelecionada.id);
+      const reservaId = pendenciaSelecionada.reservaVeiculoId;
 
-      Toast.show({
-        type: 'success',
-        text1: 'KM registrado',
-        text2: 'O KM foi registrado com sucesso'
+      let fotoOdometroUrl: string | undefined;
+
+      if (imageUri) {
+        const formData = new FormData();
+        const filename = imageUri.split('/').pop() || 'odometro.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        
+        formData.append('file', {
+          uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+          name: filename,
+          type,
+        } as any);
+
+        const uploadResult = await apiClient.uploadFotoOdometro(veiculoId, formData);
+        if (uploadResult.success) {
+          fotoOdometroUrl = uploadResult.data.key;
+        }
+      }
+
+      if (fotosCarro.length > 0 && reservaId) {
+        for (const foto of fotosCarro) {
+          if (!foto.key) {
+            const formData = new FormData();
+            const filename = foto.uri.split('/').pop() || 'foto.jpg';
+            const match = /\.(\w+)$/.exec(filename);
+            const type = match ? `image/${match[1]}` : 'image/jpeg';
+            
+            formData.append('file', {
+              uri: foto.uri,
+              name: filename,
+              type,
+            } as any);
+
+            const uploadResult = await apiClient.uploadFotoReserva(reservaId, formData);
+            if (uploadResult.success) {
+              foto.key = uploadResult.data.key;
+            }
+          }
+        }
+      }
+
+      if (observacoes.trim() && reservaId) {
+        await apiClient.atualizarObservacoesReserva(reservaId, observacoes.trim());
+      }
+
+      await apiClient.createHistoricoKm(veiculoId, {
+        kmRegistrado: km,
+        observacoes: `Registrado via pendência - Reserva #${reservaId}`,
+        fotoOdometro: fotoOdometroUrl
       });
 
-      setModalVisible(false);
-      setPendenciaSelecionada(null);
-      setKmValue('');
-      loadPendencias();
+      if (reservaId) {
+        await apiClient.updateReservaKmFinal(reservaId, km);
+      }
+
+      Alert.alert(
+        'Atualizar data/hora de fim?',
+        'Deseja atualizar a data e hora de fim da reserva para o momento atual?',
+        [
+          {
+            text: 'Não',
+            style: 'cancel',
+            onPress: async () => {
+              await PendenciasApi.concluirPendencia(pendenciaSelecionada.id, false);
+              Toast.show({
+                type: 'success',
+                text1: 'KM registrado',
+                text2: 'O KM foi registrado com sucesso',
+              });
+              setModalVisible(false);
+              setPendenciaSelecionada(null);
+              setKmValue('');
+              setImageUri(null);
+              setFotosCarro([]);
+              setObservacoes('');
+              loadPendencias();
+            },
+          },
+          {
+            text: 'Sim',
+            onPress: async () => {
+              await PendenciasApi.concluirPendencia(pendenciaSelecionada.id, true);
+              Toast.show({
+                type: 'success',
+                text1: 'KM registrado',
+                text2: 'O KM foi registrado e a reserva foi atualizada',
+              });
+              setModalVisible(false);
+              setPendenciaSelecionada(null);
+              setKmValue('');
+              setImageUri(null);
+              setFotosCarro([]);
+              setObservacoes('');
+              loadPendencias();
+            },
+          },
+        ]
+      );
+
     } catch (err: any) {
       Alert.alert('Erro', err.message || 'Não foi possível registrar o KM');
     } finally {
       setSalvando(false);
+      setUploadingFotos(false);
     }
   };
 
@@ -250,13 +525,23 @@ export default function TarefasScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Registrar KM</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <TouchableOpacity onPress={() => {
+                setModalVisible(false);
+                setFotosCarro([]);
+                setObservacoes('');
+              }}>
                 <XCircle size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
 
-            {pendenciaSelecionada && (
-              <>
+            <ScrollView 
+              style={styles.modalScrollView}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+            >
+              {pendenciaSelecionada && (
+                <>
                 <View style={styles.modalInfo}>
                   <Text style={styles.modalInfoLabel}>Veículo</Text>
                   <Text style={styles.modalInfoValue}>
@@ -265,38 +550,165 @@ export default function TarefasScreen() {
                 </View>
 
                 <View style={styles.modalInputContainer}>
-                  <Text style={styles.modalInputLabel}>KM Atual</Text>
+                  <View style={styles.kmHeader}>
+                    <Text style={styles.modalInputLabel}>KM Atual</Text>
+                    {carregandoUltimoKm ? (
+                      <View style={styles.ultimoKmContainer}>
+                        <ActivityIndicator size="small" color="#6B7280" />
+                        <Text style={styles.ultimoKmText}>Carregando último KM...</Text>
+                      </View>
+                    ) : ultimoKm !== null ? (
+                      <Text style={styles.ultimoKmText}>
+                        Último KM: {ultimoKm.toLocaleString('pt-BR')}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.photoActions}>
+                    <TouchableOpacity
+                      style={styles.photoButton}
+                      onPress={handleTirarFoto}
+                      disabled={ocrLoading}
+                    >
+                      {ocrLoading ? (
+                        <ActivityIndicator size="small" color="#254985" />
+                      ) : (
+                        <>
+                          <Camera size={18} color="#254985" />
+                          <Text style={styles.photoButtonText}>Tirar Foto</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.photoButton}
+                      onPress={handleSelecionarFoto}
+                      disabled={ocrLoading}
+                    >
+                      {ocrLoading ? (
+                        <ActivityIndicator size="small" color="#254985" />
+                      ) : (
+                        <>
+                          <Upload size={18} color="#254985" />
+                          <Text style={styles.photoButtonText}>Galeria</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  {imageUri && (
+                    <View style={styles.imagePreviewContainer}>
+                      <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+                      <TouchableOpacity
+                        style={styles.removeImageButton}
+                        onPress={() => {
+                          setImageUri(null);
+                          setKmValue('');
+                        }}
+                      >
+                        <XCircle size={20} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                   <TextInput
-                    style={styles.modalInput}
+                    style={[
+                      styles.modalInput,
+                      ultimoKm !== null && kmValue && parseFloat(kmValue.replace(/[^\d,]/g, '').replace(',', '.')) < ultimoKm && styles.modalInputError
+                    ]}
                     value={kmValue}
                     onChangeText={setKmValue}
                     placeholder="Ex: 50000"
                     keyboardType="numeric"
                     autoFocus
+                    editable={!ocrLoading}
                   />
+                  {ultimoKm !== null && kmValue && parseFloat(kmValue.replace(/[^\d,]/g, '').replace(',', '.')) < ultimoKm && (
+                    <Text style={styles.errorText}>
+                      O KM não pode ser menor que {ultimoKm.toLocaleString('pt-BR')}
+                    </Text>
+                  )}
                 </View>
 
-                <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalButtonCancel]}
-                    onPress={() => setModalVisible(false)}
-                    disabled={salvando}
-                  >
-                    <Text style={styles.modalButtonCancelText}>Cancelar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalButtonSave]}
-                    onPress={handleSalvarKm}
-                    disabled={salvando}
-                  >
-                    {salvando ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={styles.modalButtonSaveText}>Salvar</Text>
+                <View style={styles.checklistSection}>
+                  <Text style={styles.checklistTitle}>Checklist do Veículo</Text>
+                  
+                  <View style={styles.fotosSection}>
+                    <Text style={styles.fotosLabel}>Fotos do Carro</Text>
+                    <View style={styles.fotosActions}>
+                      <TouchableOpacity
+                        style={styles.fotoButton}
+                        onPress={handleTirarFotoCarro}
+                        disabled={uploadingFotos}
+                      >
+                        <Camera size={16} color="#254985" />
+                        <Text style={styles.fotoButtonText}>Tirar Foto</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.fotoButton}
+                        onPress={handleAdicionarFotoCarro}
+                        disabled={uploadingFotos}
+                      >
+                        <Upload size={16} color="#254985" />
+                        <Text style={styles.fotoButtonText}>Adicionar</Text>
+                      </TouchableOpacity>
+                    </View>
+                    
+                    {fotosCarro.length > 0 && (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fotosList}>
+                        {fotosCarro.map((foto, index) => (
+                          <View key={index} style={styles.fotoItem}>
+                            <Image source={{ uri: foto.uri }} style={styles.fotoPreview} />
+                            <TouchableOpacity
+                              style={styles.removeFotoButton}
+                              onPress={() => handleRemoverFotoCarro(index)}
+                            >
+                              <XCircle size={18} color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </ScrollView>
                     )}
-                  </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.observacoesSection}>
+                    <Text style={styles.observacoesLabel}>Observações (opcional)</Text>
+                    <TextInput
+                      style={styles.observacoesInput}
+                      value={observacoes}
+                      onChangeText={setObservacoes}
+                      placeholder="Adicione observações sobre o estado do veículo..."
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                    />
+                  </View>
                 </View>
-              </>
+                </>
+              )}
+            </ScrollView>
+
+            {pendenciaSelecionada && (
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonCancel]}
+                  onPress={() => {
+                    setModalVisible(false);
+                    setFotosCarro([]);
+                    setObservacoes('');
+                  }}
+                  disabled={salvando || uploadingFotos}
+                >
+                  <Text style={styles.modalButtonCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonSave]}
+                  onPress={handleSalvarKm}
+                  disabled={salvando || uploadingFotos || !kmValue}
+                >
+                  {(salvando || uploadingFotos) ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.modalButtonSaveText}>Salvar</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
@@ -487,14 +899,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '80%',
+    maxHeight: '90%',
+    flex: 1,
+  },
+  modalScrollView: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  modalScrollContent: {
+    paddingBottom: 20,
+    paddingTop: 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   modalTitle: {
     fontSize: 20,
@@ -523,6 +947,22 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
   },
+  kmHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  ultimoKmContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  ultimoKmText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
   modalInput: {
     borderWidth: 1,
     borderColor: '#D1D5DB',
@@ -531,9 +971,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#F9FAFB',
   },
+  modalInputError: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
   modalActions: {
     flexDirection: 'row',
     gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#fff',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   modalButton: {
     flex: 1,
@@ -557,6 +1008,147 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 16,
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  photoButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 6,
+  },
+  photoButtonText: {
+    color: '#254985',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  ocrButton: {
+    backgroundColor: '#254985',
+    borderColor: '#254985',
+  },
+  ocrButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    marginBottom: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    padding: 4,
+  },
+  checklistSection: {
+    marginTop: 24,
+    marginBottom: 24,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  checklistTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  fotosSection: {
+    marginBottom: 20,
+  },
+  fotosLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  fotosActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  fotoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#254985',
+    backgroundColor: '#F0F4FF',
+    gap: 6,
+  },
+  fotoButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#254985',
+  },
+  fotosList: {
+    marginTop: 8,
+  },
+  fotoItem: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  fotoPreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  removeFotoButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  observacoesSection: {
+    marginTop: 16,
+  },
+  observacoesLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  observacoesInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#F9FAFB',
+    minHeight: 100,
+    textAlignVertical: 'top',
   },
 });
 

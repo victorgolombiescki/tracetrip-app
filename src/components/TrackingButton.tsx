@@ -38,15 +38,18 @@ export const TrackingButton: React.FC<TrackingButtonProps> = ({ style }) => {
 
 
     const handleToggleTracking = async () => {
+        console.log(`🔄 [TRACKING_BUTTON] Botão pressionado. Estado atual: ${isTracking ? 'ATIVO' : 'INATIVO'}`);
         setIsLoading(true);
         
         try {
             if (isTracking) {
+                console.log('🛑 [TRACKING_BUTTON] Parando rastreamento...');
                 await trackingService.stopTracking();
                 setIsTracking(false);
                 await loadOfflineStats();
                 Alert.alert('Rastreamento', 'Rastreamento desabilitado com sucesso!');
             } else {
+                console.log('🚀 [TRACKING_BUTTON] Iniciando rastreamento...');
                 await trackingService.startTracking();
                 setIsTracking(true);
                 await loadOfflineStats();

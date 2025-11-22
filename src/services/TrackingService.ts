@@ -25,19 +25,13 @@ export interface LocationData {
 }
 
 async function sendOrStoreLocation(locationData: LocationData): Promise<void> {
-    const timestamp = new Date(locationData.timestamp).toLocaleString('pt-BR');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`📍 [TRACKING] ✅ LOCALIZAÇÃO CAPTURADA!`);
-    console.log(`   📍 Coordenadas: ${locationData.latitude.toFixed(6)}, ${locationData.longitude.toFixed(6)}`);
-    console.log(`   📏 Precisão: ${locationData.accuracy?.toFixed(1) || 'N/A'}m`);
-    console.log(`   🕐 Timestamp: ${timestamp}`);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
+    console.log(`📤 [TRACKING] Tentando enviar localização para API...`);
     const sent = await sendLocationToAPI(locationData);
     if (sent) {
-        console.log(`✅ [TRACKING] ✅ Localização ENVIADA para API com sucesso!`);
+        console.log(`✅ [TRACKING] Localização enviada com SUCESSO para o backend!`);
+        console.log(`   📍 Coordenadas: ${locationData.latitude.toFixed(6)}, ${locationData.longitude.toFixed(6)}`);
     } else {
-        console.log(`💾 [TRACKING] Salvando localização offline (API indisponível ou sem token)`);
+        console.log(`💾 [TRACKING] Falha ao enviar para API, salvando localmente para sincronizar depois...`);
         try {
             await localDatabaseService.saveLocation({
                 latitude: locationData.latitude,
@@ -45,7 +39,7 @@ async function sendOrStoreLocation(locationData: LocationData): Promise<void> {
                 timestamp: locationData.timestamp,
                 accuracy: locationData.accuracy,
             });
-            console.log(`✅ [TRACKING] ✅ Localização SALVA offline com sucesso!`);
+            console.log(`✅ [TRACKING] Localização salva localmente com sucesso`);
         } catch (error) {
             console.error('❌ [TRACKING] Erro ao salvar localização offline:', error);
         }
@@ -65,17 +59,21 @@ async function getAuthToken(): Promise<string | null> {
 
 async function sendLocationToAPI(locationData: LocationData): Promise<boolean> {
     try {
+        console.log(`🔍 [TRACKING] Verificando configuração da API...`);
         const apiUrl = String(process.env.EXPO_PUBLIC_API_BASE_URL);
         if (!apiUrl || apiUrl === 'undefined') {
             console.log(`⚠️ [TRACKING] API URL não configurada`);
             return false;
         }
+        console.log(`✅ [TRACKING] API URL: ${apiUrl}`);
 
+        console.log(`🔍 [TRACKING] Obtendo token de autenticação...`);
         const token = await getAuthToken();
         if (!token) {
             console.log(`⚠️ [TRACKING] Token de autenticação não encontrado`);
             return false;
         }
+        console.log(`✅ [TRACKING] Token obtido (primeiros 20 chars: ${token.substring(0, 20)}...)`);
 
         const payload = {
             latitude: locationData.latitude,
@@ -87,8 +85,9 @@ async function sendLocationToAPI(locationData: LocationData): Promise<boolean> {
             heading: locationData.heading,
         };
 
-        console.log(`📤 [TRACKING] Enviando localização para API: ${apiUrl}/rastreamento/location`);
-
+        console.log(`📤 [TRACKING] Enviando requisição POST para ${apiUrl}/rastreamento/location...`);
+        console.log(`   📍 Payload: lat=${payload.latitude.toFixed(6)}, lng=${payload.longitude.toFixed(6)}`);
+        
         const response = await fetch(`${apiUrl}/rastreamento/location`, {
             method: 'POST',
             headers: {
@@ -98,28 +97,34 @@ async function sendLocationToAPI(locationData: LocationData): Promise<boolean> {
             body: JSON.stringify(payload)
         });
 
+        console.log(`📥 [TRACKING] Resposta recebida: Status ${response.status} ${response.statusText}`);
+
         if (response.ok) {
-            console.log(`✅ [TRACKING] Resposta da API: ${response.status} ${response.statusText}`);
+            const responseData = await response.json().catch(() => null);
+            console.log(`✅ [TRACKING] API respondeu com sucesso (${response.status})`);
+            if (responseData) {
+                console.log(`   📊 Resposta: ${JSON.stringify(responseData).substring(0, 100)}...`);
+            }
             return true;
         } else {
+            const errorText = await response.text().catch(() => 'Erro desconhecido');
             console.log(`❌ [TRACKING] Erro na API: ${response.status} ${response.statusText}`);
+            console.log(`   📄 Detalhes: ${errorText.substring(0, 200)}`);
             return false;
         }
     } catch (error) {
         console.error('❌ [TRACKING] Erro ao enviar para API:', error);
+        if (error instanceof Error) {
+            console.error(`   📄 Mensagem: ${error.message}`);
+            console.error(`   📄 Stack: ${error.stack?.substring(0, 200)}`);
+        }
         return false;
     }
 }
 
-console.log(`📋 [TRACKING] Registrando background task: ${BACKGROUND_TASK_NAME}`);
-
 TaskManager.defineTask(BACKGROUND_TASK_NAME, async ({ data, error }) => {
-    console.log('🔥🔥🔥 [BACKGROUND] TASK CHAMADA PELO SISTEMA! 🔥🔥🔥');
     const timestamp = new Date().toLocaleString('pt-BR');
-    console.log('═══════════════════════════════════════════════════════');
-    console.log(`🔄 [BACKGROUND] Background task executada - ${timestamp}`);
-    console.log(`🔄 [BACKGROUND] Data recebida:`, JSON.stringify(data));
-    
+
     if (error) {
         console.error('❌ [BACKGROUND] Background task error:', error);
         console.error('❌ [BACKGROUND] Error details:', JSON.stringify(error));
@@ -128,25 +133,23 @@ TaskManager.defineTask(BACKGROUND_TASK_NAME, async ({ data, error }) => {
     }
 
     try {
+        console.log(`🔄 [BACKGROUND] Executando background task - ${timestamp}`);
+        
         const trackingEnabled = await SecureStore.getItemAsync('tracking_enabled');
         if (trackingEnabled !== 'true') {
-            console.log(`⏸️ [BACKGROUND] Tracking desabilitado, ignorando...`);
+            console.log('⚠️ [BACKGROUND] Rastreamento desabilitado, ignorando...');
             return;
         }
 
         const isLocationEnabled = await Location.hasServicesEnabledAsync();
         if (!isLocationEnabled) {
-            console.log(`⚠️ [BACKGROUND] Serviços de localização desabilitados`);
             return;
         }
 
         const { status: backgroundStatus } = await Location.getBackgroundPermissionsAsync();
         if (backgroundStatus !== 'granted') {
-            console.log(`⚠️ [BACKGROUND] Permissão de background não concedida: ${backgroundStatus}`);
             return;
         }
-
-        console.log(`🔍 [BACKGROUND] Buscando localização (background task)...`);
 
         let location;
         let locationSource = '';
@@ -164,16 +167,13 @@ TaskManager.defineTask(BACKGROUND_TASK_NAME, async ({ data, error }) => {
                 if (ageMinutes < 5) {
                     location = lastKnownLocation;
                     locationSource = `Última conhecida (${ageMinutes} min atrás)`;
-                    console.log(`✅ [BACKGROUND] Usando última localização conhecida recente (${ageMinutes} min atrás): ${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`);
                 } else {
-                    console.log(`⚠️ [BACKGROUND] Última localização conhecida muito antiga (${ageMinutes} min), tentando obter nova...`);
                     try {
                         location = await Location.getCurrentPositionAsync({
                             accuracy: Location.Accuracy.Lowest,
                             mayShowUserSettingsDialog: false,
                         });
                         locationSource = 'Lowest (atual)';
-                        console.log(`✅ [BACKGROUND] Localização obtida (Lowest): ${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`);
                     } catch (positionError) {
                         console.log(`⚠️ [BACKGROUND] Erro ao obter localização atual: ${positionError instanceof Error ? positionError.message : String(positionError)}`);
                         location = lastKnownLocation;
@@ -182,14 +182,12 @@ TaskManager.defineTask(BACKGROUND_TASK_NAME, async ({ data, error }) => {
                     }
                 }
             } else {
-                console.log(`⚠️ [BACKGROUND] Nenhuma localização conhecida, tentando obter nova...`);
                 try {
                     location = await Location.getCurrentPositionAsync({
                         accuracy: Location.Accuracy.Lowest,
                         mayShowUserSettingsDialog: false,
                     });
                     locationSource = 'Lowest (atual)';
-                    console.log(`✅ [BACKGROUND] Localização obtida (Lowest): ${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`);
                 } catch (positionError) {
                     console.log(`❌ [BACKGROUND] Não foi possível obter localização: ${positionError instanceof Error ? positionError.message : String(positionError)}`);
                     return;
@@ -209,10 +207,13 @@ TaskManager.defineTask(BACKGROUND_TASK_NAME, async ({ data, error }) => {
             speed: location.coords.speed ?? undefined,
             heading: location.coords.heading ?? undefined,
         };
-        console.log(`📊 [BACKGROUND] Fonte: ${locationSource} | Timestamp: ${new Date(locationData.timestamp).toLocaleString('pt-BR')}`);
+        
+        console.log(`📍 [BACKGROUND] Localização obtida: ${locationData.latitude.toFixed(6)}, ${locationData.longitude.toFixed(6)}`);
+        console.log(`📍 [BACKGROUND] Fonte: ${locationSource}`);
+        console.log(`📍 [BACKGROUND] Precisão: ${locationData.accuracy ? locationData.accuracy.toFixed(0) + 'm' : 'N/A'}`);
+        console.log(`📍 [BACKGROUND] Timestamp: ${new Date(locationData.timestamp).toLocaleString('pt-BR')}`);
+        
         await sendOrStoreLocation(locationData);
-        console.log(`✅ [BACKGROUND] Background task concluída com sucesso`);
-        console.log('═══════════════════════════════════════════════════════');
     } catch (error) {
         console.error('❌ [BACKGROUND] Erro no background task:', error);
         if (error instanceof Error) {
@@ -251,9 +252,7 @@ class TrackingService {
                 console.log(`❌ [PERMISSÕES] Permissão de foreground negada: ${foregroundStatus}`);
                 return false;
             }
-            console.log(`✅ [PERMISSÕES] Permissão de foreground concedida`);
 
-            console.log(`🔐 [PERMISSÕES] Solicitando permissão de background...`);
             try {
                 const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
                 if (backgroundStatus !== 'granted') {
@@ -291,48 +290,43 @@ class TrackingService {
     }
 
     async startTracking(): Promise<void> {
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('🚀 [TRACKING] ===== INICIANDO RASTREAMENTO =====');
+        console.log('═══════════════════════════════════════════════════════');
+        console.log(`🔍 [TRACKING] Estado atual: ${this.isTracking ? 'JÁ ESTÁ ATIVO' : 'INATIVO'}`);
+        
         try {
-            console.log('═══════════════════════════════════════════════════════');
-            console.log(`🚀 [TRACKING] ===== INICIANDO RASTREAMENTO =====`);
-            console.log('═══════════════════════════════════════════════════════');
-            
             if (this.isTracking) {
-                console.log(`⚠️ [TRACKING] Tracking já está ativo, ignorando...`);
+                console.log('⚠️ [TRACKING] Rastreamento já está ativo, ignorando chamada...');
                 return;
             }
+            
+            console.log('🔍 [TRACKING] Verificando permissões e inicializando...');
 
-            console.log(`🚀 [TRACKING] Iniciando rastreamento...`);
-            console.log(`🚀 [TRACKING] Chamando initializeTracking()...`);
             const hasPermission = await this.initializeTracking();
-            console.log(`🚀 [TRACKING] initializeTracking() retornou: ${hasPermission}`);
+            console.log(`🔍 [TRACKING] Permissões obtidas: ${hasPermission ? '✅ SIM' : '❌ NÃO'}`);
             
             if (!hasPermission) {
-                console.log(`❌ [TRACKING] Permissões de localização negadas`);
+                console.error('❌ [TRACKING] Permissões de localização necessárias');
                 throw new Error('Permissões de localização necessárias');
             }
 
+            console.log('✅ [TRACKING] Permissões OK, ativando rastreamento...');
             this.isTracking = true;
             await SecureStore.setItemAsync('tracking_enabled', 'true');
-            console.log(`✅ [TRACKING] Tracking habilitado e salvo`);
+            console.log('✅ [TRACKING] Flag de rastreamento salva no SecureStore');
 
             await this.syncPendingLocations();
             
-            console.log(`📱 [TRACKING] Usando APENAS background task (app aberto ou fechado)`);
             const { status: backgroundPermissionStatus } = await Location.getBackgroundPermissionsAsync();
-            console.log(`🔐 [TRACKING] Status da permissão de background: ${backgroundPermissionStatus}`);
             
             if (backgroundPermissionStatus !== 'granted') {
-                console.error(`❌ [TRACKING] Permissão de background não concedida: ${backgroundPermissionStatus}`);
                 throw new Error('Permissão de background necessária para rastreamento em segundo plano');
             }
 
             const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
-            console.log(`📋 [TRACKING] Background task já registrada? ${isTaskRegistered}`);
             
             if (!isTaskRegistered) {
-                console.log(`🔄 [TRACKING] Registrando background task...`);
-                console.log(`⚙️ [TRACKING] Configuração: intervalo=${TRACKING_INTERVAL / 1000}s, accuracy=Balanced`);
-                
                 await Location.startLocationUpdatesAsync(BACKGROUND_TASK_NAME, {
                     accuracy: Location.Accuracy.Balanced,
                     timeInterval: TRACKING_INTERVAL,
@@ -353,25 +347,22 @@ class TrackingService {
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 const isNowRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
-                if (isNowRegistered) {
-                    console.log(`✅ [TRACKING] Background task registrada com sucesso!`);
-                    console.log(`⏱️ [TRACKING] Intervalo configurado: ${TRACKING_INTERVAL / 1000} segundos`);
-                    console.log(`📱 [TRACKING] A task executará automaticamente a cada ${TRACKING_INTERVAL / 1000}s`);
-                } else {
-                    console.error(`❌ [TRACKING] FALHA: Background task não foi registrada após tentativa`);
+                if (!isNowRegistered) {
                     throw new Error('Falha ao registrar background task');
                 }
+                console.log('✅ [TRACKING] Background task registrada com sucesso!');
+                console.log(`✅ [TRACKING] Rastreamento iniciado - Intervalo: ${TRACKING_INTERVAL / 1000}s`);
+                console.log('✅ [TRACKING] Localizações serão enviadas automaticamente a cada 30 segundos');
             } else {
-                console.log(`✅ [TRACKING] Background task já estava registrada`);
+                console.log('✅ [TRACKING] Background task já estava registrada, continuando...');
             }
             
             console.log('═══════════════════════════════════════════════════════');
-            console.log(`✅ [TRACKING] ===== RASTREAMENTO INICIADO COM SUCESSO =====`);
+            console.log('✅ [TRACKING] ===== RASTREAMENTO ATIVO =====');
             console.log('═══════════════════════════════════════════════════════');
-            console.log(`📌 [TRACKING] IMPORTANTE: A background task executará automaticamente`);
-            console.log(`📌 [TRACKING] Procure por logs: "🔥🔥🔥 [BACKGROUND] TASK CHAMADA PELO SISTEMA!"`);
-            console.log(`📌 [TRACKING] A task pode levar alguns segundos para começar a executar`);
-            console.log(`📌 [TRACKING] Se não aparecer logs da task, o app precisa ser rebuild`);
+            console.log(`📍 [TRACKING] Status: ATIVO`);
+            console.log(`⏱️  [TRACKING] Intervalo: ${TRACKING_INTERVAL / 1000} segundos`);
+            console.log(`📱 [TRACKING] Modo: Background + Foreground`);
             console.log('═══════════════════════════════════════════════════════');
         } catch (error: unknown) {
             console.error('═══════════════════════════════════════════════════════');
@@ -389,8 +380,11 @@ class TrackingService {
     }
 
     async stopTracking(): Promise<void> {
-        console.log('🛑 [TRACKING] Parando tracking...');
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('🛑 [TRACKING] ===== PARANDO RASTREAMENTO =====');
+        console.log('═══════════════════════════════════════════════════════');
         if (!this.isTracking) {
+            console.log('⚠️ [TRACKING] Rastreamento já estava parado');
             console.log('🛑 [TRACKING] Tracking já estava parado');
             return;
         }
@@ -403,8 +397,15 @@ class TrackingService {
             const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
             if (isTaskRegistered) {
                 await Location.stopLocationUpdatesAsync(BACKGROUND_TASK_NAME);
+                console.log('✅ [TRACKING] Background task parada com sucesso');
+            } else {
+                console.log('ℹ️  [TRACKING] Background task já estava parada');
             }
-        } catch (error) {}
+            console.log('✅ [TRACKING] Rastreamento desabilitado e salvo');
+            console.log('═══════════════════════════════════════════════════════');
+        } catch (error) {
+            console.error('❌ [TRACKING] Erro ao parar tracking:', error);
+        }
     }
 
     async isTrackingEnabled(): Promise<boolean> {
@@ -418,11 +419,8 @@ class TrackingService {
     }
 
     async restoreTrackingIfEnabled(): Promise<void> {
-        console.log('🔄 [RESTORE] Verificando se precisa restaurar tracking...');
         try {
             const wasEnabled = await this.isTrackingEnabled();
-            console.log(`🔄 [RESTORE] Tracking estava habilitado? ${wasEnabled ? 'SIM' : 'NÃO'}`);
-            console.log(`🔄 [RESTORE] Tracking está ativo? ${this.isTracking ? 'SIM' : 'NÃO'}`);
             
             if (wasEnabled && !this.isTracking) {
                 console.log('🔄 [RESTORE] Restaurando tracking...');
@@ -432,11 +430,8 @@ class TrackingService {
 
                     await this.syncPendingLocations();
                     
-                    console.log(`📱 [RESTORE] Usando APENAS background task (app aberto ou fechado)`);
-
                     try {
                         const { status: backgroundPermissionStatus } = await Location.getBackgroundPermissionsAsync();
-                        console.log(`🔐 [RESTORE] Status da permissão de background: ${backgroundPermissionStatus}`);
                         
                         if (backgroundPermissionStatus !== 'granted') {
                             console.error(`❌ [RESTORE] Permissão de background não concedida: ${backgroundPermissionStatus}`);
@@ -444,10 +439,8 @@ class TrackingService {
                         }
 
                         const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
-                        console.log(`📋 [RESTORE] Background task já registrada? ${isTaskRegistered}`);
                         
                         if (!isTaskRegistered) {
-                            console.log(`🔄 [RESTORE] Registrando background task...`);
                             await Location.startLocationUpdatesAsync(BACKGROUND_TASK_NAME, {
                                 accuracy: Location.Accuracy.Balanced,
                                 timeInterval: TRACKING_INTERVAL,
@@ -467,15 +460,8 @@ class TrackingService {
                             
                             await new Promise(resolve => setTimeout(resolve, 500));
                             
-                            const isNowRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
-                            if (isNowRegistered) {
-                                console.log(`✅ [RESTORE] Background task registrada com sucesso!`);
-                            } else {
-                                console.error(`❌ [RESTORE] FALHA: Background task não foi registrada`);
-                            }
-                        } else {
-                            console.log(`✅ [RESTORE] Background task já estava registrada`);
-                        }
+                            await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
+                        } 
                     } catch (error) {
                         console.error('❌ Erro ao restaurar background tracking:', error);
                         if (error instanceof Error) {
@@ -483,7 +469,6 @@ class TrackingService {
                         }
                     }
                 } else {
-                    console.log('🔄 [RESTORE] Sem permissão, desabilitando tracking...');
                     await SecureStore.setItemAsync('tracking_enabled', 'false');
                 }
             } else {
@@ -514,32 +499,30 @@ class TrackingService {
 
     async checkBackgroundTaskStatus(): Promise<void> {
         try {
+            console.log('═══════════════════════════════════════════════════════');
+            console.log('🔍 [TRACKING] ===== VERIFICANDO STATUS =====');
+            console.log('═══════════════════════════════════════════════════════');
+            
             const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
             const { status: backgroundPermission } = await Location.getBackgroundPermissionsAsync();
+            const { status: foregroundPermission } = await Location.getForegroundPermissionsAsync();
             const trackingEnabled = await this.isTrackingEnabled();
             const isLocationEnabled = await Location.hasServicesEnabledAsync();
             
-            console.log('═══════════════════════════════════════════════════════');
-            console.log(`📊 [STATUS] ===== DIAGNÓSTICO DO TRACKING =====`);
-            console.log('═══════════════════════════════════════════════════════');
-            console.log(`   ✅ Task registrada: ${isTaskRegistered ? 'SIM' : '❌ NÃO'}`);
-            console.log(`   ✅ Permissão background: ${backgroundPermission === 'granted' ? 'CONCEDIDA' : `❌ ${backgroundPermission}`}`);
-            console.log(`   ✅ Tracking habilitado: ${trackingEnabled ? 'SIM' : '❌ NÃO'}`);
-            console.log(`   ✅ Tracking ativo: ${this.isTracking ? 'SIM' : '❌ NÃO'}`);
-            console.log(`   ✅ Localização habilitada: ${isLocationEnabled ? 'SIM' : '❌ NÃO'}`);
-            console.log(`   ✅ Modo: APENAS background task (app aberto ou fechado)`);
-            console.log(`   ✅ Intervalo: ${TRACKING_INTERVAL / 1000} segundos`);
-            console.log('═══════════════════════════════════════════════════════');
+            console.log(`📍 [STATUS] Rastreamento habilitado: ${trackingEnabled ? '✅ SIM' : '❌ NÃO'}`);
+            console.log(`📍 [STATUS] Background task registrada: ${isTaskRegistered ? '✅ SIM' : '❌ NÃO'}`);
+            console.log(`📍 [STATUS] Permissão foreground: ${foregroundPermission === 'granted' ? '✅ CONCEDIDA' : '❌ NEGADA'}`);
+            console.log(`📍 [STATUS] Permissão background: ${backgroundPermission === 'granted' ? '✅ CONCEDIDA' : '❌ NEGADA'}`);
+            console.log(`📍 [STATUS] GPS habilitado: ${isLocationEnabled ? '✅ SIM' : '❌ NÃO'}`);
+            console.log(`📍 [STATUS] Estado interno: ${this.isTracking ? '✅ ATIVO' : '❌ INATIVO'}`);
+            console.log(`⏱️  [STATUS] Intervalo: ${TRACKING_INTERVAL / 1000} segundos`);
             
-            if (!isTaskRegistered && trackingEnabled) {
-                console.log(`⚠️ [STATUS] ATENÇÃO: Tracking está habilitado mas a task não está registrada!`);
+            if (isTaskRegistered && trackingEnabled && backgroundPermission === 'granted' && isLocationEnabled) {
+                console.log('✅ [STATUS] Tudo configurado corretamente! Rastreamento deve estar funcionando.');
+            } else {
+                console.log('⚠️  [STATUS] Alguma configuração está faltando. Verifique os itens acima.');
             }
             
-            if (isTaskRegistered && trackingEnabled && backgroundPermission === 'granted') {
-                console.log(`✅ [STATUS] Tudo configurado! A task deve executar a cada ${TRACKING_INTERVAL / 1000}s`);
-                console.log(`📌 [STATUS] Procure por logs: "🔥🔥🔥 [BACKGROUND] TASK CHAMADA PELO SISTEMA!"`);
-                console.log(`📌 [STATUS] Se não aparecer, o app precisa ser rebuild após mudanças no app.json`);
-            }
             console.log('═══════════════════════════════════════════════════════');
         } catch (error) {
             console.error('❌ Erro ao verificar status:', error);
@@ -547,41 +530,24 @@ class TrackingService {
     }
 
     async testLogs(): Promise<void> {
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('🧪 [TEST] ===== TESTE DE LOGS =====');
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('🧪 [TEST] Se você está vendo isso, os logs estão funcionando!');
-        console.log('🧪 [TEST] Timestamp:', new Date().toLocaleString('pt-BR'));
-        console.log('🧪 [TEST] BACKGROUND_TASK_NAME:', BACKGROUND_TASK_NAME);
-        console.log('🧪 [TEST] TRACKING_INTERVAL:', TRACKING_INTERVAL / 1000, 'segundos');
         await this.checkBackgroundTaskStatus();
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('🧪 [TEST] ===== FIM DO TESTE =====');
-        console.log('═══════════════════════════════════════════════════════');
     }
 }
 
 export const trackingService = new TrackingService();
 
-console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('✅ [TRACKING] trackingService INSTANCIADO');
-console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
 async function trySyncBatch(): Promise<void> {
     try {
         const online = await localDatabaseService.isOnline();
         if (!online) {
-            console.log(`📴 [SYNC] Dispositivo offline, pulando sincronização`);
             return;
         }
 
         const unsynced = await localDatabaseService.getUnsyncedLocations();
         if (!unsynced || unsynced.length === 0) {
-            console.log(`✅ [SYNC] Nenhuma localização pendente para sincronizar`);
             return;
         }
 
-        console.log(`🔄 [SYNC] Sincronizando ${unsynced.length} localização(ões) pendente(s)...`);
         const successIds: number[] = [];
         for (const rec of unsynced) {
             const ok = await sendLocationToAPI({
@@ -596,7 +562,6 @@ async function trySyncBatch(): Promise<void> {
         if (successIds.length > 0) {
             await localDatabaseService.markAsSynced(successIds);
             await localDatabaseService.deleteSyncedLocations();
-            console.log(`✅ [SYNC] ${successIds.length} localização(ões) sincronizada(s) com sucesso`);
         } else {
             console.log(`⚠️ [SYNC] Nenhuma localização foi sincronizada (erro na API ou sem token)`);
         }

@@ -51,3 +51,5 @@ echo "   3. Tente fazer um EAS Build: eas build --profile apk --platform android
 
 
 
+
+

@@ -104,7 +104,6 @@ export default function RootLayout() {
 
   const checkAuth = async () => {
     try {
-      console.log('🔐 Verificando autenticação...');
       setAuth({ isLoading: true });
 
       let storedAuth;
@@ -121,20 +120,17 @@ export default function RootLayout() {
       }
 
       if (storedAuth && storedAuth.token) {
-        console.log('🔑 Token encontrado, validando...');
         try {
           const isValid = await Promise.race([
             authService.validateToken(storedAuth.token),
             new Promise<boolean>((resolve) => 
               setTimeout(() => {
-                console.warn('⚠️ Timeout na validação do token - assumindo inválido');
                 resolve(false);
               }, 8000)
             )
           ]);
 
           if (isValid) {
-            console.log('✅ Token válido, autenticando usuário');
             setAuth({
               user: storedAuth.user,
               token: storedAuth.token,
@@ -152,24 +148,11 @@ export default function RootLayout() {
             
             setTimeout(async () => {
               try {
-                console.log('📱 Inicializando push notifications (OneSignal)...');
-                const token = await PushNotificationService.initialize();
-                if (token) {
-                  console.log('✅ Push notifications (OneSignal) inicializado com sucesso');
-                  await PushNotificationService.tentarRegistrarTokenNovamente();
-                  
-                  if (storedAuth?.user?.id) {
-                    await PushNotificationService.setExternalUserId(storedAuth.user.id.toString());
-                    await PushNotificationService.diagnosticarEstado();
-                  }
-                } else {
-                  console.log('ℹ️  Aguardando token OneSignal...');
-                  if (storedAuth?.user?.id) {
-                    setTimeout(async () => {
-                      await PushNotificationService.setExternalUserId(storedAuth.user.id.toString());
-                      await PushNotificationService.diagnosticarEstado();
-                    }, 3000);
-                  }
+                await PushNotificationService.initialize();
+                if (storedAuth?.user?.id) {
+                  const externalId = storedAuth.user.email || storedAuth.user.id.toString();
+                  await PushNotificationService.setExternalUserId(externalId);
+                  await PushNotificationService.diagnosticarEstado();
                 }
               } catch (err) {
                 console.error('❌ Erro ao inicializar push notifications (não bloqueante):', err);

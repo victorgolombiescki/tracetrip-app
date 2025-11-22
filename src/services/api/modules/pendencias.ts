@@ -36,7 +36,8 @@ export const PendenciasApi = {
     apiClient.getPendencias(status),
   getPendenciasCount: async () => apiClient.getPendenciasCount(),
   getPendenciaById: async (id: number) => apiClient.getPendenciaById(id),
-  concluirPendencia: async (id: number) => apiClient.concluirPendencia(id),
+  concluirPendencia: async (id: number, atualizarDataHoraFim?: boolean) => 
+    apiClient.concluirPendencia(id, atualizarDataHoraFim),
   cancelarPendencia: async (id: number) => apiClient.cancelarPendencia(id),
 };
 

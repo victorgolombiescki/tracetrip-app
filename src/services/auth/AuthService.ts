@@ -33,10 +33,19 @@ export class AuthService {
       await secureStorage.setItemAsync(USER_KEY, JSON.stringify(user));
 
       const { PushNotificationService } = await import('@/src/services/PushNotificationService');
-      setTimeout(() => {
-        PushNotificationService.tentarRegistrarTokenNovamente().catch(err => {
+      setTimeout(async () => {
+        try {
+          if (user?.id) {
+            const externalId = user.email || user.id.toString();
+            console.log(`📱 Definindo External User ID primeiro para usuário ${user.id} (email: ${user.email})`);
+            await PushNotificationService.setExternalUserId(externalId);
+            await PushNotificationService.diagnosticarEstado();
+          } else {
+            await PushNotificationService.tentarRegistrarTokenNovamente();
+          }
+        } catch (err) {
           console.error('Erro ao registrar token push após login (não bloqueante):', err);
-        });
+        }
       }, 1000);
 
       return { user, token };
@@ -74,14 +83,43 @@ export class AuthService {
   }
 
   async logout(): Promise<void> {
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('🚪 [LOGOUT] ===== INICIANDO LOGOUT =====');
+    console.log('═══════════════════════════════════════════════════════');
+    
     try {
-      await apiClient.logout();
+      console.log('📱 [LOGOUT] Limpando OneSignal e tokens...');
+      const { PushNotificationService } = await import('@/src/services/PushNotificationService');
+      
+      console.log('📱 [LOGOUT] Removendo External User ID do OneSignal...');
+      await PushNotificationService.removeExternalUserId();
+      console.log('✅ [LOGOUT] External User ID removido');
+      
+      console.log('📱 [LOGOUT] Desativando token no backend...');
+      await PushNotificationService.desativarToken();
+      console.log('✅ [LOGOUT] Token desativado');
+      
+      console.log('✅ [LOGOUT] OneSignal e tokens limpos com sucesso');
     } catch (error) {
-      console.error('Logout API call failed:', error);
+      console.error('❌ [LOGOUT] Erro ao limpar OneSignal no logout (não bloqueante):', error);
+    }
+
+    try {
+      console.log('🌐 [LOGOUT] Chamando API de logout...');
+      await apiClient.logout();
+      console.log('✅ [LOGOUT] API de logout chamada com sucesso');
+    } catch (error) {
+      console.error('❌ [LOGOUT] Logout API call failed:', error);
     } finally {
+      console.log('🗑️  [LOGOUT] Limpando dados locais...');
       await secureStorage.deleteItemAsync(TOKEN_KEY);
       await secureStorage.deleteItemAsync(USER_KEY);
       apiClient.setToken(null);
+      console.log('✅ [LOGOUT] Dados locais limpos');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('✅ [LOGOUT] ===== LOGOUT CONCLUÍDO =====');
+      console.log('✅ [LOGOUT] Dispositivo pronto para novo login');
+      console.log('═══════════════════════════════════════════════════════');
     }
   }
 
