@@ -32,23 +32,8 @@ export class ApiClient {
         const detectedURL = `http://${expoIP}:3002`;
         
         if (this.lastDetectedIP && this.lastDetectedIP !== expoIP) {
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log('⚠️ [ApiClient] IP MUDOU!');
-          console.log(`   IP anterior: ${this.lastDetectedIP}`);
-          console.log(`   IP atual: ${expoIP}`);
-          console.log(`   URL anterior: http://${this.lastDetectedIP}:3002`);
-          console.log(`   Nova URL: ${detectedURL}`);
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         } else if (!this.lastDetectedIP) {
           const currentIP = this.extractIPFromURL(envBaseURL);
-          if (currentIP && currentIP !== expoIP) {
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            console.log('🔄 [ApiClient] IP detectado diferente do configurado');
-            console.log(`   IP configurado: ${currentIP}`);
-            console.log(`   IP detectado: ${expoIP}`);
-            console.log(`   Atualizando para: ${detectedURL}`);
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          }
         }
         
         this.lastDetectedIP = expoIP;
@@ -60,7 +45,6 @@ export class ApiClient {
         }
       }
     } catch (error) {
-      console.warn('[ApiClient] Erro ao detectar IP do Expo:', error);
     }
 
     return envBaseURL;
@@ -101,7 +85,6 @@ export class ApiClient {
         }
       }
     } catch (error) {
-      console.warn('[ApiClient] Erro ao obter IP do Expo:', error);
     }
 
     return null;
@@ -116,13 +99,6 @@ export class ApiClient {
   }
 
   private logBaseURL(): void {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🌐 [ApiClient] Base URL configurada:');
-    console.log(`   ${this.baseURL}`);
-    if (this.lastDetectedIP) {
-      console.log(`   IP detectado: ${this.lastDetectedIP}`);
-    }
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   }
 
   getBaseURL(): string {
@@ -172,7 +148,6 @@ export class ApiClient {
 
     const currentBaseURL = this.getBaseURL();
     const url = `${currentBaseURL}${path}`;
-    console.log(`[ApiClient] ${method} ${url}`, body ? { body: { ...body, senha: '***' } } : '');
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -187,14 +162,12 @@ export class ApiClient {
         signal: controller?.signal,
       } as any);
 
-      console.log(`[ApiClient] Response status: ${res.status} ${res.statusText}`);
       const text = await res.text();
       
       let json: any = undefined;
       try {
         json = text ? JSON.parse(text) : undefined;
       } catch (parseError) {
-        console.error('[ApiClient.http] Erro ao fazer parse do JSON:', parseError);
       }
 
       if (!res.ok) {
@@ -206,7 +179,6 @@ export class ApiClient {
       }
       return { success: true, data: json as T };
     } catch (e: any) {
-      console.error('[ApiClient.http] Exceção capturada:', e);
       const isAbort = e?.name === 'AbortError';
       const friendly = isAbort
         ? { title: 'Tempo esgotado', description: 'A conexão demorou demais. Tente novamente.' }
@@ -263,9 +235,6 @@ export class ApiClient {
     dataFim: string;
     status: string;
   }>>> {
-    console.log('[ApiClient.getRotasSimples] Iniciando requisição para /app/rotas/simples/lista');
-    console.log('[ApiClient.getRotasSimples] Base URL:', this.getBaseURL());
-    console.log('[ApiClient.getRotasSimples] Token presente:', !!this.token);
     const response = await this.http<Array<{
       id: string;
       nome: string;
@@ -273,7 +242,6 @@ export class ApiClient {
       dataFim: string;
       status: string;
     }>>('GET', '/app/rotas/simples/lista');
-    console.log('[ApiClient.getRotasSimples] Resposta recebida:', JSON.stringify(response, null, 2));
     return response;
   }
 
@@ -360,7 +328,6 @@ export class ApiClient {
         apenasRotaAtual: filtros?.apenasRotaAtual !== undefined ? filtros.apenasRotaAtual : true
       }
     };
-    console.log('[ApiClient.getDespesas] Enviando filtros:', JSON.stringify(body, null, 2));
     return this.http('POST', '/app/despesas/filtros', body);
   }
 
