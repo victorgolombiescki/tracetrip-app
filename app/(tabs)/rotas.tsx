@@ -113,13 +113,10 @@ export default function RotasScreen() {
         setLoadingMore(true);
       }
 
-      let apiFilters: { status?: 'todas' | 'futuras' | 'em_andamento' | 'passadas' };
+      // Filtra diretamente pelo status da API, sem lógica adicional
+      const apiFilters: { status?: 'todas' | 'futuras' | 'em_andamento' | 'passadas' } = { status: filter };
       
-      if (filter === 'em_andamento') {
-        apiFilters = { status: 'todas' };
-      } else {
-        apiFilters = { status: filter };
-      }
+      console.log(`🔵 [ROTAS] Filtro: ${filter} - Buscando rotas com status: ${filter} diretamente da API`);
       
       const resp = await RotasApi.list(apiFilters, reset ? 1 : page, 10);
       
@@ -128,37 +125,29 @@ export default function RotasScreen() {
       }
       
       const data = resp.data;
-
       let items: RotaItem[] = data.items || [];
       
-      if (filter === 'em_andamento') {
-        items = items.filter(item => {
-          if (item.status === 'em_andamento') {
-            return true;
-          }
-          
-          if (item.status === 'passadas' && (item.finalizarViagem === false || item.finalizarViagem === null)) {
-            return true;
-          }
-          
-          return false;
-        });
-      } else if (filter === 'passadas') {
-        items = items.filter(item => 
-          item.status === 'passadas' && item.finalizarViagem === true
-        );
-      } else if (filter === 'futuras') {
-        items = items.filter(item => item.status === 'futuras');
-      }
+      console.log(`📦 [ROTAS] Recebidos da API: ${items.length} rotas com status: ${filter}`);
+      console.log('📋 [ROTAS] Rotas recebidas:');
+      items.forEach((item, index) => {
+        console.log(`   ${index + 1}. ID: ${item.id}, Nome: ${item.nome}, Status: ${item.status}, FinalizarViagem: ${item.finalizarViagem}`);
+      });
 
       if (reset) {
         setRotas(items);
+        console.log(`✅ [ROTAS] Rotas definidas no estado: ${items.length} rotas`);
       } else {
-        setRotas(prev => [...prev, ...items]);
+        setRotas(prev => {
+          const novasRotas = [...prev, ...items];
+          console.log(`✅ [ROTAS] Rotas atualizadas: ${prev.length} + ${items.length} = ${novasRotas.length} rotas`);
+          return novasRotas;
+        });
       }
 
       setHasMore(data.meta?.currentPage < data.meta?.totalPages);
       setPage(data.meta?.currentPage + 1);
+      
+      console.log(`📄 [ROTAS] Paginação - Página atual: ${data.meta?.currentPage}, Total de páginas: ${data.meta?.totalPages}, Tem mais: ${data.meta?.currentPage < data.meta?.totalPages}`);
       
       retryCountRef.current = 0;
       
@@ -282,7 +271,7 @@ export default function RotasScreen() {
               <View style={[styles.statusBadge, { backgroundColor: theme.bg }]}> 
                 <Text style={[styles.statusText, { color: theme.fg }]}>
                   {item.status === 'futuras' ? 'Futura' : 
-                    (item.status === 'em_andamento' || (item.status === 'passadas' && item.finalizarViagem === null)) ? 'Em Andamento' : 'Passada'}
+                    (item.status === 'em_andamento' || (item.status === 'passadas' && item.finalizarViagem === null)) ? 'ento' : 'Passada'}
                 </Text>
               </View>
             </View>
@@ -429,6 +418,7 @@ export default function RotasScreen() {
           <TouchableOpacity 
             style={[styles.filterButton, filter === 'em_andamento' && styles.filterButtonActive]}
             onPress={() => {
+              console.log('👆 [ROTAS] Usuário clicou no filtro: em_andamento');
               setFilter('em_andamento');
               setLoading(true);
             }}

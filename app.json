@@ -2,9 +2,9 @@
   "expo": {
     "name": "TraceTrip",
     "slug": "trace-trip",
-    "version": "1.0.3",
+    "version": "1.0.6",
     "orientation": "portrait",
-    "icon": "./assets/icone_t.png",
+    "icon": "./assets/logo.png",
     "splash": {
       "image": "./assets/logo.png",
       "resizeMode": "contain",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.tracetrip.app",
-      "versionCode": 4,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icone_t.png",
         "backgroundColor": "#1E40AF"
@@ -48,7 +48,25 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tracetrip.app",
-      "icon": "./assets/icone_t.png"
+      "buildNumber": "6",
+      "icon": "./assets/logo.png",
+      "splash": {
+        "image": "./assets/logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#1E40AF"
+      },
+      "infoPlist": {
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Este aplicativo precisa acessar sua localização para navegação turn-by-turn, orientação de direção para destinos da rota, alertas de chegada e registro de viagem.",
+        "NSLocationAlwaysUsageDescription": "Este aplicativo precisa acessar sua localização em background para navegação contínua, orientação de direção durante o trajeto, alertas de chegada nos destinos da rota e otimização de roteamento em tempo real.",
+        "NSLocationWhenInUseUsageDescription": "Este aplicativo precisa acessar sua localização para navegação, orientação de direção, alertas de chegada e registro de viagem.",
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ],
+        "NSCameraUsageDescription": "Este aplicativo precisa acessar a câmera para tirar fotos de despesas e documentos.",
+        "NSPhotoLibraryUsageDescription": "Este aplicativo precisa acessar sua galeria para selecionar fotos de despesas e documentos.",
+        "NSMicrophoneUsageDescription": "Este aplicativo precisa acessar o microfone para gravar áudios relacionados às viagens."
+      }
     },
     "web": {
       "bundler": "metro",
@@ -64,9 +82,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Este aplicativo precisa acessar sua localização para rastreamento de viagem.",
-          "locationAlwaysPermission": "Este aplicativo precisa acessar sua localização em background para rastreamento contínuo.",
-          "locationWhenInUsePermission": "Este aplicativo precisa acessar sua localização para rastreamento de viagem.",
+          "locationAlwaysAndWhenInUsePermission": "Este aplicativo precisa acessar sua localização para navegação turn-by-turn, orientação de direção para destinos da rota, alertas de chegada e registro de viagem.",
+          "locationAlwaysPermission": "Este aplicativo precisa acessar sua localização em background para navegação contínua, orientação de direção durante o trajeto, alertas de chegada nos destinos da rota e otimização de roteamento em tempo real.",
+          "locationWhenInUsePermission": "Este aplicativo precisa acessar sua localização para navegação, orientação de direção, alertas de chegada e registro de viagem.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true,

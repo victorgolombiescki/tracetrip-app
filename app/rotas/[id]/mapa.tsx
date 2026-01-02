@@ -13,6 +13,7 @@ export default function RotaMapaScreen() {
   const [detalhe, setDetalhe] = useState<DetalhesRotaResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [mapLoading, setMapLoading] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   const handleWebViewMessage = (event: any) => {
     try {
@@ -38,13 +39,37 @@ export default function RotaMapaScreen() {
       const response = await RotasDetalhesApi.getDetalhesRota(Number(id));
       
       if (response.success && response.data) {
-        setDetalhe(response.data.data);
+        setDetalhe(response.data);
       } else {
-        Alert.alert('Erro', response.message || 'Não foi possível carregar os dados da rota');
+        const errorMessage = response.message || 'Não foi possível carregar os dados da rota';
+        console.error('❌ Erro ao carregar rota:', errorMessage);
+        
+        // Não mostra alerta se for timeout - o ApiClient já mostra toast
+        if (!errorMessage.includes('demorou demais') && !errorMessage.includes('Tempo esgotado')) {
+          Alert.alert('Erro', errorMessage, [
+            { text: 'OK', onPress: () => router.back() }
+          ]);
+        } else {
+          // Se for timeout, apenas volta após um delay
+          setTimeout(() => {
+            router.back();
+          }, 2000);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erro ao carregar rota:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os dados da rota');
+      const errorMessage = error?.message || 'Não foi possível carregar os dados da rota';
+      
+      // Não mostra alerta duplicado se já foi mostrado pelo ApiClient
+      if (!errorMessage.includes('demorou demais') && !errorMessage.includes('timeout')) {
+        Alert.alert('Erro', errorMessage, [
+          { text: 'OK', onPress: () => router.back() }
+        ]);
+      } else {
+        setTimeout(() => {
+          router.back();
+        }, 2000);
+      }
     } finally {
       setLoading(false);
     }
@@ -75,30 +100,51 @@ export default function RotaMapaScreen() {
   const generateMapHTML = () => {
     let enderecosParaUsar = detalhe?.enderecos || [];
     
-
-    
     const sortedEnderecos = enderecosParaUsar.sort((a, b) => a.ordem - b.ordem);
     
     const coordinates = sortedEnderecos
       .filter(endereco => {
         const hasValidCoords = endereco.latitude && endereco.longitude && 
-                              !isNaN(endereco.latitude) && !isNaN(endereco.longitude);
+                              !isNaN(endereco.latitude) && !isNaN(endereco.longitude) &&
+                              endereco.latitude !== 0 && endereco.longitude !== 0;
         return hasValidCoords;
       })
       .map(endereco => ({
-        lat: endereco.latitude,
-        lng: endereco.longitude,
-        nome: endereco.local?.nome || endereco.endereco,
-        endereco: endereco.local?.endereco || endereco.endereco,
+        lat: Number(endereco.latitude),
+        lng: Number(endereco.longitude),
+        nome: (endereco.local?.nome || endereco.endereco || 'Ponto').replace(/'/g, "\\'").replace(/"/g, '\\"'),
+        endereco: (endereco.local?.endereco || endereco.endereco || '').replace(/'/g, "\\'").replace(/"/g, '\\"'),
         ordem: endereco.ordem
       }));
+
+    if (coordinates.length === 0) {
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Mapa da Rota</title>
+          <style>
+            body { margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+            .error { text-align: center; padding: 20px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="error">
+            <h3>Nenhum ponto de localização encontrado</h3>
+            <p>Esta rota não possui endereços com coordenadas válidas.</p>
+          </div>
+        </body>
+        </html>
+      `;
+    }
 
     const centerLat = coordinates.reduce((sum, coord) => sum + coord.lat, 0) / coordinates.length;
     const centerLng = coordinates.reduce((sum, coord) => sum + coord.lng, 0) / coordinates.length;
 
-    const markers = coordinates.map((coord, index) => {
-      const color = index === 0 ? 'green' : index === coordinates.length - 1 ? 'red' : 'blue';
-      
+    // Otimização: preparar dados dos markers de forma eficiente
+    const markersData = coordinates.map((coord, index) => {
       let adjustedLat = coord.lat;
       let adjustedLng = coord.lng;
       
@@ -111,44 +157,24 @@ export default function RotaMapaScreen() {
         }
       }
       
-        const endereco = sortedEnderecos[index];
-        const dataVisita = endereco.dataVisita ? new Date(endereco.dataVisita).toLocaleDateString('pt-BR') : 'Data não informada';
-        const horarioChegada = endereco.horarioChegada || 'Horário não informado';
-        const horarioSaida = endereco.horarioSaida || 'Horário não informado';
-        
-        const popupHTML = `
-          <div style="min-width: 250px; padding: 8px;">
-            <h4 style="margin: 0 0 12px 0; color: ${color}; font-size: 16px; text-align: center;">📍 Ponto ${index + 1}</h4>
-            
-            <div style="margin-bottom: 12px;">
-              <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #333;">${coord.nome}</p>
-              <p style="margin: 0 0 8px 0; font-size: 12px; color: #666; line-height: 1.4;">${coord.endereco}</p>
-            </div>
-            
-            <div style="background: #f8f9fa; padding: 8px; border-radius: 6px; margin-bottom: 12px;">
-              <p style="margin: 0 0 4px 0; font-size: 11px; color: #666;"><strong>📅 Data:</strong> ${dataVisita}</p>
-              <p style="margin: 0 0 4px 0; font-size: 11px; color: #666;"><strong>🕐 Chegada:</strong> ${horarioChegada}</p>
-              <p style="margin: 0; font-size: 11px; color: #666;"><strong>🕐 Saída:</strong> ${horarioSaida}</p>
-            </div>
-            
-            <button onclick="window.ReactNativeWebView.postMessage(JSON.stringify({action: 'openGoogleMaps', lat: ${adjustedLat}, lng: ${adjustedLng}, nome: '${coord.nome}'}))" 
-                    style="width: 100%; background: #4285f4; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">
-              🗺️ Abrir no Google Maps
-            </button>
-          </div>
-        `;
+      const endereco = sortedEnderecos[index];
+      const dataVisita = endereco.dataVisita ? new Date(endereco.dataVisita).toLocaleDateString('pt-BR') : 'Data não informada';
+      const horarioChegada = endereco.horarioChegada || 'Horário não informado';
+      const horarioSaida = endereco.horarioSaida || 'Horário não informado';
+      const color = index === 0 ? 'green' : index === coordinates.length - 1 ? 'red' : 'blue';
       
-      return `
-        L.marker([${adjustedLat}, ${adjustedLng}], {
-          icon: L.divIcon({
-            html: '<div style="background: ${color}; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 3px solid white; box-shadow: 0 3px 6px rgba(0,0,0,0.4);">${index + 1}</div>',
-            className: 'custom-marker',
-            iconSize: [32, 32],
-            iconAnchor: [16, 16]
-          })
-        }).addTo(map).bindPopup(\`${popupHTML}\`);
-      `;
-    }).join('\n');
+      return {
+        lat: adjustedLat,
+        lng: adjustedLng,
+        nome: coord.nome,
+        endereco: coord.endereco,
+        dataVisita,
+        horarioChegada,
+        horarioSaida,
+        color,
+        index
+      };
+    });
 
     return `
       <!DOCTYPE html>
@@ -163,38 +189,57 @@ export default function RotaMapaScreen() {
           #map { height: 100vh; width: 100%; }
           .custom-marker { background: transparent !important; border: none !important; }
           .leaflet-popup-content { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+          /* Remover marca d'água do Leaflet */
+          .leaflet-control-attribution { display: none !important; }
         </style>
       </head>
       <body>
         <div id="map"></div>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
-          const map = L.map('map').setView([${centerLat}, ${centerLng}], 13);
-          
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-          }).addTo(map);
-          
-          ${markers}
-          
-          const group = new L.featureGroup();
-          ${coordinates.map((coord, index) => {
-            let adjustedLat = coord.lat;
-            let adjustedLng = coord.lng;
+          try {
+            const map = L.map('map', {
+              zoomControl: true,
+              attributionControl: false
+            }).setView([${centerLat}, ${centerLng}], 13);
             
-            for (let i = 0; i < index; i++) {
-              if (coordinates[i].lat === coord.lat && coordinates[i].lng === coord.lng) {
-                const offsetDistance = 0.001; 
-                adjustedLat += (index % 2 === 0 ? offsetDistance : -offsetDistance);
-                adjustedLng += (index % 2 === 0 ? offsetDistance : -offsetDistance);
-                break;
-              }
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              maxZoom: 19,
+              minZoom: 3
+            }).addTo(map);
+            
+            // Dados dos markers
+            const markersData = ${JSON.stringify(markersData)};
+            
+            // Criar markers de forma otimizada
+            const markers = [];
+            const group = new L.featureGroup();
+            
+            markersData.forEach(function(markerInfo) {
+              const popupHTML = '<div style="min-width:250px;padding:8px;"><h4 style="margin:0 0 12px 0;color:' + markerInfo.color + ';font-size:16px;text-align:center;">📍 Ponto ' + (markerInfo.index + 1) + '</h4><div style="margin-bottom:12px;"><p style="margin:0 0 6px 0;font-size:13px;font-weight:bold;color:#333;">' + markerInfo.nome.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p><p style="margin:0 0 8px 0;font-size:12px;color:#666;line-height:1.4;">' + markerInfo.endereco.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p></div><div style="background:#f8f9fa;padding:8px;border-radius:6px;margin-bottom:12px;"><p style="margin:0 0 4px 0;font-size:11px;color:#666;"><strong>📅 Data:</strong> ' + markerInfo.dataVisita.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p><p style="margin:0 0 4px 0;font-size:11px;color:#666;"><strong>🕐 Chegada:</strong> ' + markerInfo.horarioChegada.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p><p style="margin:0;font-size:11px;color:#666;"><strong>🕐 Saída:</strong> ' + markerInfo.horarioSaida.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p></div><button onclick="window.ReactNativeWebView.postMessage(JSON.stringify({action:\\'openGoogleMaps\\',lat:' + markerInfo.lat + ',lng:' + markerInfo.lng + ',nome:\\'' + markerInfo.nome.replace(/'/g, "\\'") + '\\'}))" style="width:100%;background:#4285f4;color:white;border:none;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;">🗺️ Abrir no Google Maps</button></div>';
+              
+              const marker = L.marker([markerInfo.lat, markerInfo.lng], {
+                icon: L.divIcon({
+                  html: '<div style="background:' + markerInfo.color + ';border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:14px;border:3px solid white;box-shadow:0 3px 6px rgba(0,0,0,0.4);">' + (markerInfo.index + 1) + '</div>',
+                  className: 'custom-marker',
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 16]
+                })
+              }).bindPopup(popupHTML);
+              
+              marker.addTo(map);
+              markers.push(marker);
+              group.addLayer(marker);
+            });
+            
+            // Ajustar zoom para mostrar todos os markers
+            if (group.getLayers().length > 0) {
+              map.fitBounds(group.getBounds(), { padding: [30, 30], maxZoom: 16 });
             }
-            
-            return `group.addLayer(L.marker([${adjustedLat}, ${adjustedLng}]));`;
-          }).join('\n')}
-          
-          map.fitBounds(group.getBounds(), { padding: [30, 30] });
+          } catch (error) {
+            console.error('Erro ao carregar mapa:', error);
+            document.body.innerHTML = '<div style="padding:20px;text-align:center;color:#666;">Erro ao carregar o mapa. Por favor, tente novamente.</div>';
+          }
         </script>
       </body>
       </html>
@@ -204,7 +249,7 @@ export default function RotaMapaScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <LinearGradient colors={["#2563EB", "#1D4ED8"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
               <ArrowLeft size={24} color="white" />
@@ -224,7 +269,7 @@ export default function RotaMapaScreen() {
   if (!detalhe) {
     return (
       <SafeAreaView style={styles.container}>
-        <LinearGradient colors={["#2563EB", "#1D4ED8"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
               <ArrowLeft size={24} color="white" />
@@ -246,49 +291,87 @@ export default function RotaMapaScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header Compacto */}
-      <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={24} color="white" />
-          </TouchableOpacity>
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>{detalhe?.rota?.nome || 'Mapa da Rota'}</Text>
-            <Text style={styles.headerSubtitle}>
-              {detalhe?.enderecos?.length || 3} pontos • {detalhe?.estatisticas?.distanciaTotal?.toFixed(1) || '15.2'} km
-            </Text>
+        <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <ArrowLeft size={24} color="white" />
+            </TouchableOpacity>
+            <View style={styles.headerInfo}>
+              <Text style={styles.headerTitle}>{detalhe?.rota?.nome || 'Mapa da Rota'}</Text>
+              {detalhe?.enderecos && detalhe.enderecos.length > 0 && (
+                <Text style={styles.headerSubtitle}>
+                  {detalhe.enderecos.length} ponto{detalhe.enderecos.length !== 1 ? 's' : ''} {detalhe?.estatisticas?.distanciaTotal ? `• ${detalhe.estatisticas.distanciaTotal.toFixed(1)} km` : ''}
+                </Text>
+              )}
+            </View>
+            {detalhe?.enderecos && detalhe.enderecos.length >= 2 && (
+              <TouchableOpacity
+                style={styles.googleMapsButton}
+                onPress={openInGoogleMaps}
+                activeOpacity={0.7}
+              >
+                <Navigation size={20} color="white" />
+              </TouchableOpacity>
+            )}
+            {(!detalhe?.enderecos || detalhe.enderecos.length < 2) && (
+              <View style={styles.placeholder} />
+            )}
           </View>
-          <TouchableOpacity
-            style={styles.googleMapsButton}
-            onPress={openInGoogleMaps}
-            activeOpacity={0.7}
-          >
-            <Navigation size={20} color="white" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+        </LinearGradient>
 
       {/* Mapa Full Screen */}
       <View style={styles.mapContainer}>
-        <WebView
-          style={styles.mapWebView}
-          source={{ html: generateMapHTML() }}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          startInLoadingState={true}
-          onLoadStart={() => setMapLoading(true)}
-          onLoadEnd={() => setMapLoading(false)}
-          onMessage={handleWebViewMessage}
-          renderLoading={() => (
-            <View style={styles.mapLoading}>
-              <ActivityIndicator size="large" color="#2563EB" />
-              <Text style={styles.mapLoadingText}>Carregando mapa...</Text>
-            </View>
-          )}
-        />
+        {mapError ? (
+          <View style={styles.mapErrorContainer}>
+            <Text style={styles.mapErrorTitle}>Erro ao carregar mapa</Text>
+            <Text style={styles.mapErrorText}>{mapError}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => {
+                setMapError(null);
+                setMapLoading(true);
+              }}
+            >
+              <Text style={styles.retryButtonText}>Tentar novamente</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <WebView
+            style={styles.mapWebView}
+            source={{ html: generateMapHTML() }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            onLoadStart={() => {
+              setMapLoading(true);
+              setMapError(null);
+            }}
+            onLoadEnd={() => setMapLoading(false)}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('❌ Erro no WebView:', nativeEvent);
+              setMapError('Não foi possível carregar o mapa. Verifique sua conexão.');
+              setMapLoading(false);
+            }}
+            onHttpError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('❌ Erro HTTP no WebView:', nativeEvent);
+              setMapError('Erro ao carregar recursos do mapa.');
+              setMapLoading(false);
+            }}
+            onMessage={handleWebViewMessage}
+            renderLoading={() => (
+              <View style={styles.mapLoading}>
+                <ActivityIndicator size="large" color="#254985" />
+                <Text style={styles.mapLoadingText}>Carregando mapa...</Text>
+              </View>
+            )}
+          />
+        )}
         
-        {mapLoading && (
+        {mapLoading && !mapError && (
           <View style={styles.mapLoading}>
-            <ActivityIndicator size="large" color="#2563EB" />
+            <ActivityIndicator size="large" color="#254985" />
             <Text style={styles.mapLoadingText}>Carregando mapa...</Text>
           </View>
         )}
@@ -394,5 +477,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginTop: 16,
+  },
+  mapErrorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#F9FAFB',
+  },
+  mapErrorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  mapErrorText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#254985',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

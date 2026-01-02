@@ -50,7 +50,7 @@ export class ApiClient {
 
   private async http<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: any, extraHeaders?: Record<string, string>): Promise<ApiResponse<T>> {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined as any;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 15000) : undefined;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 30000) : undefined; // Aumentado para 30 segundos
 
     try {
       const headers: Record<string, string> = {
