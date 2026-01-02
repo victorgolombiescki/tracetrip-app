@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, Linking, PermissionsAndroid, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,12 +10,13 @@ import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
 import { Ocorrencia, Rota } from '@/src/types';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Mic, Square, Settings, AlertCircle } from 'lucide-react-native';
+import { ArrowLeft, Mic, Square, Settings, AlertCircle, Lock } from 'lucide-react-native';
 import { AudioModule, useAudioRecorder, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 import { RotasApi } from '@/src/services/api/modules/rotas';
 import { OcorrenciasApi } from '@/src/services/api/modules/ocorrencias';
 import Toast from 'react-native-toast-message';
 import { useAppStore } from '@/src/store/useAppStore';
+import { apiClient } from '@/src/services/api/ApiClient';
 
 interface RotaSimples {
   id: string;
@@ -40,7 +41,32 @@ export default function NovaOcorrenciaScreen() {
   const [routePickerOpen, setRoutePickerOpen] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'checking'>('checking');
   const [transcribing, setTranscribing] = useState(false);
-  const { currentRoute } = useAppStore();
+  const { currentRoute, empresaPlano, setEmpresaPlano } = useAppStore();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadEmpresaPlano();
+    }, [])
+  );
+
+  const loadEmpresaPlano = async () => {
+    try {
+      const resp = await apiClient.getEmpresa();
+      if (resp.success && resp.data) {
+        setEmpresaPlano(resp.data.plano || null);
+      }
+    } catch (error) {
+    }
+  };
+
+  const moduloDisponivel = (modulo: string): boolean => {
+    if (!empresaPlano) return true;
+    if (empresaPlano === 'TRACETRIP') return true;
+    if (empresaPlano === 'TRACEFROTAS') {
+      return modulo === 'Frota';
+    }
+    return true;
+  };
 
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
@@ -257,6 +283,36 @@ export default function NovaOcorrenciaScreen() {
 
     return null;
   };
+
+  if (!moduloDisponivel('Viagens')) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+          <View style={styles.heroRow}>
+            <TouchableOpacity onPress={handleClose} style={styles.backBtn}>
+              <ArrowLeft size={22} color="#fff" />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.heroTitle}>Nova Ocorrência</Text>
+              <Text style={styles.heroSubtitle}>Grave o áudio e descreva o ocorrido</Text>
+            </View>
+            <View style={{ width: 22 }} />
+          </View>
+        </LinearGradient>
+
+        <View style={styles.blockedContainer}>
+          <View style={styles.blockedContent}>
+            <Lock size={48} color="#9CA3AF" />
+            <Text style={styles.blockedTitle}>Módulo Indisponível</Text>
+            <Text style={styles.blockedSubtitle}>
+              Este módulo está disponível apenas para assinantes do plano TraceTrip.{'\n'}
+              Atualmente você possui o plano TraceFrotas, que inclui apenas o módulo de Frota.
+            </Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -690,5 +746,29 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 10,
     fontWeight: '600',
+  },
+  blockedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    backgroundColor: '#FFFFFF',
+  },
+  blockedContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  blockedTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 8,
+  },
+  blockedSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

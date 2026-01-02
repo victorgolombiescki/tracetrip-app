@@ -751,6 +751,19 @@ export class ApiClient {
   async marcarTodasNotificacoesComoLidas(): Promise<ApiResponse<{ quantidade: number }>> {
     return this.http('PUT', '/app/notificacoes/marcar-todas-lidas');
   }
+
+  async getEmpresa(): Promise<ApiResponse<{
+    id: number;
+    nome: string;
+    email: string;
+    logoUrl: string;
+    status: string;
+    obrigarTipoViagem?: boolean;
+    criarOrcamentosAutomaticamente?: boolean;
+    plano?: string;
+  }>> {
+    return this.http('GET', '/empresa');
+  }
 }
 
 export const apiClient = new ApiClient();

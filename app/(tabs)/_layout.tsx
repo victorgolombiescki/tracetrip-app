@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { Tabs, router } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { View, TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
+import { Tabs, router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { 
   House, 
@@ -10,12 +10,53 @@ import {
   Plus, 
   Microphone, 
   CaretRight,
-  Car
+  Car,
+  Lock
 } from 'phosphor-react-native';
+import { useAppStore } from '@/src/store/useAppStore';
+import { apiClient } from '@/src/services/api/ApiClient';
 
 export default function TabLayout() {
   const [fabOpen, setFabOpen] = useState(false);
   const insets = useSafeAreaInsets();
+  const { empresaPlano, setEmpresaPlano } = useAppStore();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadEmpresaPlano();
+    }, [])
+  );
+
+  const loadEmpresaPlano = async () => {
+    try {
+      const resp = await apiClient.getEmpresa();
+      if (resp.success && resp.data) {
+        setEmpresaPlano(resp.data.plano || null);
+      }
+    } catch (error) {
+    }
+  };
+
+  const moduloDisponivel = (modulo: string): boolean => {
+    if (!empresaPlano) return true;
+    if (empresaPlano === 'TRACETRIP') return true;
+    if (empresaPlano === 'TRACEFROTAS') {
+      return modulo === 'Frota';
+    }
+    return true;
+  };
+
+  const handleTabPress = (modulo: string, route: string) => {
+    if (!moduloDisponivel(modulo)) {
+      Alert.alert(
+        'Módulo Indisponível',
+        'Este módulo está disponível apenas para assinantes do plano TraceTrip. Atualmente você possui o plano TraceFrotas, que inclui apenas o módulo de Frota.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    }
+    return true;
+  };
 
   const icon = (Icon: any, weight: "regular" | "fill" | "duotone" = "regular") => ({ focused }: { focused: boolean }) => (
     <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
@@ -131,12 +172,26 @@ export default function TabLayout() {
             { bottom: 80 + insets.bottom }
           ]}>
             <TouchableOpacity
-              style={[styles.actionRow, styles.actionRowFirst]}
+              style={[
+                styles.actionRow, 
+                styles.actionRowFirst,
+                !moduloDisponivel('Viagens') && styles.actionRowDisabled
+              ]}
               onPress={() => {
+                if (!moduloDisponivel('Viagens')) {
+                  setFabOpen(false);
+                  Alert.alert(
+                    'Módulo Indisponível',
+                    'Este módulo está disponível apenas para assinantes do plano TraceTrip.',
+                    [{ text: 'OK' }]
+                  );
+                  return;
+                }
                 setFabOpen(false);
                 router.push('/nova-despesa');
               }}
               accessibilityLabel="Nova despesa"
+              disabled={!moduloDisponivel('Viagens')}
             >
               <View style={styles.actionLeft}>
                 <View style={styles.actionIconWrap}>
@@ -292,5 +347,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
+  },
+  lockBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  actionRowDisabled: {
+    opacity: 0.5,
   },
 });

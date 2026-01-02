@@ -1,27 +1,55 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Modal, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Modal, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { Eye, Utensils, Car, Home, Fuel, Package, Receipt, CreditCard, MapPin, Globe } from 'lucide-react-native';
+import { Eye, Utensils, Car, Home, Fuel, Package, Receipt, CreditCard, MapPin, Globe, Lock } from 'lucide-react-native';
 import { Card } from '@/src/components/ui/Card';
 import { DespesasApi } from '@/src/services/api/modules/despesas';
 import { Despesa } from '@/src/types';
 import { LinearGradient } from 'expo-linear-gradient';
 import { tryCatch, handleError } from '@/src/utils/errorHandler';
 import ErrorBoundary from '@/src/components/ErrorBoundary';
+import { useAppStore } from '@/src/store/useAppStore';
+import { apiClient } from '@/src/services/api/ApiClient';
 
 export default function DespesasScreen() {
+  const { empresaPlano, setEmpresaPlano } = useAppStore();
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [filter, setFilter] = useState<'PENDENTE' | 'APROVADO' | 'REPROVADO'>('PENDENTE');
-  const [apenasRotaAtual, setApenasRotaAtual] = useState(true); // Por padrão mostra apenas rota atual
+  const [apenasRotaAtual, setApenasRotaAtual] = useState(true);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMorePages, setHasMorePages] = useState(true);
   const [loadingImage, setLoadingImage] = useState<string | null>(null);
   const [tooltipText, setTooltipText] = useState<string | null>(null);
   const fetchingRef = useRef(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadEmpresaPlano();
+    }, [])
+  );
+
+  const loadEmpresaPlano = async () => {
+    try {
+      const resp = await apiClient.getEmpresa();
+      if (resp.success && resp.data) {
+        setEmpresaPlano(resp.data.plano || null);
+      }
+    } catch (error) {
+    }
+  };
+
+  const moduloDisponivel = (modulo: string): boolean => {
+    if (!empresaPlano) return true;
+    if (empresaPlano === 'TRACETRIP') return true;
+    if (empresaPlano === 'TRACEFROTAS') {
+      return modulo === 'Frota';
+    }
+    return true;
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -295,6 +323,113 @@ export default function DespesasScreen() {
       </View>
     );
   };
+
+  if (!moduloDisponivel('Viagens')) {
+    const despesaSimulada: Despesa = {
+      id: '0',
+      nome: 'Almoço executivo',
+      tipo: 'ALIMENTACAO',
+      valor: '45.50',
+      data: new Date().toISOString(),
+      hora: '12:30',
+      status: 'PENDENTE',
+      temAnexo: false,
+      rota: 'Viagem São Paulo',
+    };
+
+    const TipoIcon = getTipoIcon(despesaSimulada.tipo);
+    const tipoColor = getTipoColor(despesaSimulada.tipo);
+
+    return (
+      <ErrorBoundary>
+        <SafeAreaView style={styles.container}>
+          <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+            <View style={styles.heroRow}>
+              <View style={styles.heroTitleContainer}>
+                <View style={styles.heroIconContainer}>
+                  <CreditCard size={24} color="#fff" />
+                </View>
+                <View>
+                  <Text style={styles.heroTitle}>Despesas</Text>
+                  <Text style={styles.heroSubtitle}>Gerencie suas despesas corporativas</Text>
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+
+          <View style={styles.filters}>
+            <TouchableOpacity 
+              style={[styles.filterButton, styles.filterButtonActive]}
+              disabled
+            >
+              <Text style={[styles.filterText, styles.filterTextActive]}>Pendentes</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.filterButton}
+              disabled
+            >
+              <Text style={styles.filterText}>Aprovadas</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.filterButton}
+              disabled
+            >
+              <Text style={styles.filterText}>Reprovadas</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <View style={styles.blockedCardWrapper}>
+              <Card style={[styles.despesaCard, styles.blockedCard]}>
+                <View style={styles.despesaHeader}>
+                  <View style={styles.despesaInfo}>
+                    <View style={styles.despesaInfoRow}>
+                      <View style={[styles.iconBox, { backgroundColor: tipoColor }]}>
+                        <TipoIcon size={20} color="#FFFFFF" />
+                      </View>
+                      <View style={styles.despesaInfoText}>
+                        <Text style={styles.despesaTitle}>{despesaSimulada.nome}</Text>
+                        <Text style={styles.categoria}>{getCategoryLabel(despesaSimulada.tipo)}</Text>
+                        <Text style={styles.dataLine}>
+                          {formatDateLine(despesaSimulada.data, despesaSimulada.hora)}
+                        </Text>
+                        <Text style={styles.rotaLine}>
+                          Rota: {despesaSimulada.rota}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.despesaStatus}>
+                    <Text style={styles.valor}>{formatCurrency(despesaSimulada.valor, 'BRL')}</Text>
+                    <View style={styles.statusContainer}>
+                      {renderStatusBadge(despesaSimulada.status)}
+                    </View>
+                  </View>
+                </View>
+                
+                <View style={styles.despesaDetails}>
+                  <Text style={styles.data}>{new Date(despesaSimulada.data).toLocaleDateString('pt-BR')}</Text>
+                  <Text style={styles.hora}>{despesaSimulada.hora}</Text>
+                </View>
+              </Card>
+              <View style={styles.blockedOverlay}>
+                <View style={styles.blockedOverlayContent}>
+                  <Lock size={32} color="#9CA3AF" />
+                  <Text style={styles.blockedOverlayTitle}>Módulo Indisponível</Text>
+                  <Text style={styles.blockedOverlaySubtitle}>
+                    Este módulo está disponível apenas para assinantes do plano TraceTrip
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -686,6 +821,30 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center' },
   modalImage: { width: '90%', height: '80%' },
+  blockedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    backgroundColor: '#FFFFFF',
+  },
+  blockedContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  blockedTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 8,
+  },
+  blockedSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   statusCircle: {
     width: 10,
     height: 10,
@@ -705,5 +864,40 @@ const styles = StyleSheet.create({
   tooltipText: {
     fontSize: 14,
     color: '#111827',
+  },
+  blockedCardWrapper: {
+    position: 'relative',
+    margin: 16,
+  },
+  blockedCard: {
+    opacity: 0.75,
+  },
+  blockedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  blockedOverlayContent: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  blockedOverlayTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 4,
+  },
+  blockedOverlaySubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 16,
   },
 }); 

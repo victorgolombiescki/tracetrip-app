@@ -16,6 +16,9 @@ interface AppState {
   currentRoute: CurrentRoute | null;
   setCurrentRoute: (route: CurrentRoute | null) => void;
 
+  empresaPlano: string | null;
+  setEmpresaPlano: (plano: string | null) => void;
+
   isDarkMode: boolean;
   toggleTheme: () => void;
 }
@@ -33,6 +36,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   currentRoute: null,
   setCurrentRoute: (route) => set({ currentRoute: route }),
+
+  empresaPlano: null,
+  setEmpresaPlano: (plano) => set({ empresaPlano: plano }),
 
   isDarkMode: false,
   toggleTheme: () => set((state) => ({ isDarkMode: !state.isDarkMode })),

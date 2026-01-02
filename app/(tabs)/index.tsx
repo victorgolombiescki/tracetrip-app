@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Menu, ChevronRight, Wallet, TrendingUp, CalendarDays, Clock, MapPin, ArrowDown } from 'lucide-react-native';
+import { Bell, Menu, ChevronRight, Wallet, TrendingUp, CalendarDays, Clock, MapPin, ArrowDown, Lock } from 'lucide-react-native';
 import { useAppStore } from '@/src/store/useAppStore';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -34,6 +34,7 @@ export default function HomeScreen() {
   const [offlineStats, setOfflineStats] = useState<{ total: number; unsynced: number }>({ total: 0, unsynced: 0 });
   const [menuVisible, setMenuVisible] = useState(false);
   const [notificacoesNaoLidas, setNotificacoesNaoLidas] = useState(0);
+  const [empresaPlano, setEmpresaPlano] = useState<string | null>(null);
   const { width } = useWindowDimensions();
 
   useFocusEffect(
@@ -41,6 +42,7 @@ export default function HomeScreen() {
       loadDashboardData();
       loadCurrentRoute();
       loadNotificacoesNaoLidas();
+      loadEmpresaPlano();
       
       trackingService.restoreTrackingIfEnabled();
       
@@ -116,6 +118,41 @@ export default function HomeScreen() {
         throw new Error(resp.message || 'Falha ao carregar dados do dashboard');
       }
     }, 'Não foi possível carregar os dados do dashboard');
+  };
+
+  const { setEmpresaPlano: setEmpresaPlanoStore } = useAppStore();
+
+  const loadEmpresaPlano = async () => {
+    try {
+      const resp = await apiClient.getEmpresa();
+      if (resp.success && resp.data) {
+        const plano = resp.data.plano || null;
+        setEmpresaPlano(plano);
+        setEmpresaPlanoStore(plano);
+      }
+    } catch (error) {
+    }
+  };
+
+  const moduloDisponivel = (modulo: string): boolean => {
+    if (!empresaPlano) return true;
+    if (empresaPlano === 'TRACETRIP') return true;
+    if (empresaPlano === 'TRACEFROTAS') {
+      return modulo === 'Frota';
+    }
+    return true;
+  };
+
+  const handleModuloClick = (modulo: string, route: string) => {
+    if (!moduloDisponivel(modulo)) {
+      Alert.alert(
+        'Módulo Indisponível',
+        'Este módulo está disponível apenas para assinantes do plano TraceTrip. Atualmente você possui o plano TraceFrotas, que inclui apenas o módulo de Frota.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    router.push(route as any);
   };
 
   const periods = [
@@ -271,30 +308,60 @@ export default function HomeScreen() {
 
 
 
-          <View style={styles.budgetContainer}>
+          <View style={[
+            styles.budgetContainer,
+            !moduloDisponivel('Viagens') && styles.budgetContainerDisabled
+          ]}>
             <View style={styles.budgetHeader}>
-              <Text style={styles.budgetLabel}>Orçamento disponível</Text>
-              <View style={[styles.utilizationBadge, { backgroundColor: `${utilizationColor}20` }]}>
-                <Text style={[styles.utilizationBadgeText, { color: 'white' }]}>
-  {utilizationPercentage > 100 ? 'Mais de 100% utilizado' : `${utilizationPercentage}% utilizado`}
-</Text>
+              <View style={styles.sectionTitleWithLock}>
+                <Text style={styles.budgetLabel}>
+                  Orçamento disponível
+                </Text>
+                {!moduloDisponivel('Viagens') && (
+                  <Lock size={14} color="rgba(255,255,255,0.9)" style={styles.lockIcon} />
+                )}
               </View>
+              {moduloDisponivel('Viagens') && (
+                <View style={[styles.utilizationBadge, { backgroundColor: `${utilizationColor}20` }]}>
+                  <Text style={[styles.utilizationBadgeText, { color: 'white' }]}>
+                    {utilizationPercentage > 100 ? 'Mais de 100% utilizado' : `${utilizationPercentage}% utilizado`}
+                  </Text>
+                </View>
+              )}
             </View>
 
-            <Text style={styles.budgetAmount}>{formatCurrency(budgetRemaining)}</Text>
-
-            <View style={styles.budgetProgressContainer}>
-              <View style={[styles.budgetProgressBar, { width: `${utilizationPercentage}%`, backgroundColor: utilizationColor }]} />
-            </View>
+            {moduloDisponivel('Viagens') && (
+              <>
+                <Text style={styles.budgetAmount}>
+                  {formatCurrency(budgetRemaining)}
+                </Text>
+                <View style={styles.budgetProgressContainer}>
+                  <View style={[
+                    styles.budgetProgressBar,
+                    { width: `${utilizationPercentage}%`, backgroundColor: utilizationColor }
+                  ]} />
+                </View>
+              </>
+            )}
 
             <View style={styles.budgetDetailsRow}>
               <View style={styles.budgetDetailItem}>
                 <View style={styles.budgetDetailIconContainer}>
-                  <Wallet size={14} color="#4338CA" />
+                  <Wallet size={14} color={!moduloDisponivel('Viagens') ? "rgba(255,255,255,0.6)" : "#4338CA"} />
                 </View>
-                <View>
-                  <Text style={styles.budgetDetailLabel}>Total</Text>
-                  <Text style={styles.budgetDetailValue}>{formatCurrency(budgetTotal)}</Text>
+                <View style={styles.budgetDetailTextContainer}>
+                  <Text style={styles.budgetDetailLabel}>
+                    Total
+                  </Text>
+                  {!moduloDisponivel('Viagens') ? (
+                    <View style={styles.budgetLockedValue}>
+                      <Lock size={18} color="rgba(255,255,255,0.95)" />
+                    </View>
+                  ) : (
+                    <Text style={styles.budgetDetailValue}>
+                      {formatCurrency(budgetTotal)}
+                    </Text>
+                  )}
                 </View>
               </View>
 
@@ -302,11 +369,21 @@ export default function HomeScreen() {
 
               <View style={styles.budgetDetailItem}>
                 <View style={[styles.budgetDetailIconContainer]}>
-                  <ArrowDown size={14} color="#EF4444" />
+                  <ArrowDown size={14} color={!moduloDisponivel('Viagens') ? "rgba(255,255,255,0.6)" : "#EF4444"} />
                 </View>
-                <View>
-                  <Text style={styles.budgetDetailLabel}>Utilizado</Text>
-                  <Text style={styles.budgetDetailValue}>{formatCurrency(budgetUsed)}</Text>
+                <View style={styles.budgetDetailTextContainer}>
+                  <Text style={styles.budgetDetailLabel}>
+                    Utilizado
+                  </Text>
+                  {!moduloDisponivel('Viagens') ? (
+                    <View style={styles.budgetLockedValue}>
+                      <Lock size={18} color="rgba(255,255,255,0.95)" />
+                    </View>
+                  ) : (
+                    <Text style={styles.budgetDetailValue}>
+                      {formatCurrency(budgetUsed)}
+                    </Text>
+                  )}
                 </View>
               </View>
             </View>
@@ -400,10 +477,25 @@ export default function HomeScreen() {
         >
           <View style={styles.recordsSection}>
             <View style={styles.modernSectionHeader}>
-              <Text style={styles.modernSectionTitle}>Despesas</Text>
-              <TouchableOpacity style={styles.modernViewAllButton} onPress={navigateToDespesas}>
-                <Text style={styles.modernViewAllText}>Ver histórico</Text>
-                <ChevronRight size={14} color="#2563EB" />
+              <View style={styles.sectionTitleWithLock}>
+                <Text style={[
+                  styles.modernSectionTitle,
+                  !moduloDisponivel('Viagens') && styles.sectionTitleDisabled
+                ]}>Despesas</Text>
+                {!moduloDisponivel('Viagens') && (
+                  <Lock size={14} color="#9CA3AF" style={styles.lockIcon} />
+                )}
+              </View>
+              <TouchableOpacity 
+                style={styles.modernViewAllButton} 
+                onPress={() => handleModuloClick('Viagens', '/despesas')}
+                disabled={!moduloDisponivel('Viagens')}
+              >
+                <Text style={[
+                  styles.modernViewAllText,
+                  !moduloDisponivel('Viagens') && styles.viewAllTextDisabled
+                ]}>Ver histórico</Text>
+                <ChevronRight size={14} color={!moduloDisponivel('Viagens') ? "#9CA3AF" : "#2563EB"} />
               </TouchableOpacity>
             </View>
 
@@ -433,8 +525,21 @@ export default function HomeScreen() {
               </ScrollView>
             </View>
 
-            <View style={styles.modernTransactionsList}>
-              {current.length === 0 ? (
+            <View style={[
+              styles.modernTransactionsList,
+              !moduloDisponivel('Viagens') && styles.sectionDisabled
+            ]}>
+              {!moduloDisponivel('Viagens') ? (
+                <View style={styles.modernEmptyState}>
+                  <View style={styles.modernEmptyStateIcon}>
+                    <Lock size={24} color="#9CA3AF" />
+                  </View>
+                  <Text style={styles.modernEmptyStateTitle}>Módulo Indisponível</Text>
+                  <Text style={styles.modernEmptyStateSubtitle}>
+                    Este módulo está disponível apenas para assinantes do plano TraceTrip
+                  </Text>
+                </View>
+              ) : current.length === 0 ? (
                 <View style={styles.modernEmptyState}>
                   <View style={styles.modernEmptyStateIcon}>
                     <Wallet size={24} color="#2563EB" />
@@ -480,39 +585,76 @@ export default function HomeScreen() {
 
           <View style={styles.agendasSection}>
             <View style={styles.modernSectionHeader}>
-              <Text style={styles.modernSectionTitle}>Compromissos</Text>
-              <TouchableOpacity style={styles.modernViewAllButton} onPress={navigateToAgendas}>
-                <Text style={styles.modernViewAllText}>Ver agenda</Text>
-                <ChevronRight size={14} color="#2563EB" />
+              <View style={styles.sectionTitleWithLock}>
+                <Text style={[
+                  styles.modernSectionTitle,
+                  !moduloDisponivel('Viagens') && styles.sectionTitleDisabled
+                ]}>Compromissos</Text>
+                {!moduloDisponivel('Viagens') && (
+                  <Lock size={14} color="#9CA3AF" style={styles.lockIcon} />
+                )}
+              </View>
+              <TouchableOpacity 
+                style={styles.modernViewAllButton} 
+                onPress={() => handleModuloClick('Viagens', '/agendas')}
+                disabled={!moduloDisponivel('Viagens')}
+              >
+                <Text style={[
+                  styles.modernViewAllText,
+                  !moduloDisponivel('Viagens') && styles.viewAllTextDisabled
+                ]}>Ver agenda</Text>
+                <ChevronRight size={14} color={!moduloDisponivel('Viagens') ? "#9CA3AF" : "#2563EB"} />
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
-              style={styles.modernAgendaCard}
-              onPress={navigateToAgendas}
-              activeOpacity={0.7}
+              style={[
+                styles.modernAgendaCard,
+                !moduloDisponivel('Viagens') && styles.agendaCardDisabled
+              ]}
+              onPress={() => handleModuloClick('Viagens', '/agendas')}
+              activeOpacity={moduloDisponivel('Viagens') ? 0.7 : 1}
+              disabled={!moduloDisponivel('Viagens')}
             >
               <View style={styles.modernAgendaCardHeader}>
                 <Text style={styles.modernAgendaCardHeaderText}>AGENDA DE HOJE</Text>
               </View>
 
               <View style={styles.modernAgendaCardBody}>
-                <View style={styles.modernAgendaCardIcon}>
-                  <CalendarDays size={18} color="#2563EB" />
-                </View>
-                <View style={styles.modernAgendaCardInfo}>
-                  <Text style={styles.modernAgendaCardTitle}>
-                    {agendasCount} {agendasCount === 1 ? 'compromisso' : 'compromissos'} agendados
+                {!moduloDisponivel('Viagens') ? (
+                  <>
+                    <View style={styles.modernAgendaCardIcon}>
+                      <Lock size={18} color="#9CA3AF" />
+                    </View>
+                    <View style={styles.modernAgendaCardInfo}>
+                      <Text style={[styles.modernAgendaCardTitle, styles.agendaCardTitleDisabled]}>
+                    Módulo Indisponível
                   </Text>
-                  <View style={styles.modernAgendaCardTimeRow}>
-                    <Clock size={14} color="#64748B" />
-                    <Text style={styles.modernAgendaCardTimeText}>
-                      {new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' }).replace(/^\d+ de (\w)(\w+)$/, function (match, first, rest) {
-                        return `${match.split(' ')[0]} de ${first.toUpperCase()}${rest.toLowerCase()}`;
-                      })}
-                    </Text>
-                  </View>
-                </View>
+                      <Text style={styles.modernAgendaCardSubtitle}>
+                    Este módulo está disponível apenas para assinantes do plano TraceTrip
+                  </Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.modernAgendaCardIcon}>
+                      <CalendarDays size={18} color="#2563EB" />
+                    </View>
+                    <View style={styles.modernAgendaCardInfo}>
+                      <Text style={styles.modernAgendaCardTitle}>
+                        {agendasCount} {agendasCount === 1 ? 'compromisso' : 'compromissos'} agendados
+                      </Text>
+                      <View style={styles.modernAgendaCardTimeRow}>
+                        <Clock size={14} color="#64748B" />
+                        <Text style={styles.modernAgendaCardTimeText}>
+                          {new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' }).replace(/^\d+ de (\w)(\w+)$/, function (match, first, rest) {
+                            return `${match.split(' ')[0]} de ${first.toUpperCase()}${rest.toLowerCase()}`;
+                          })}
+                        </Text>
+                      </View>
+                    </View>
+                  </>
+                )}
               </View>
 
             </TouchableOpacity>
@@ -1356,5 +1498,49 @@ const styles = StyleSheet.create({
     color: '#254985',
     fontSize: 14,
     fontWeight: '600',
+  },
+  sectionTitleWithLock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  lockIcon: {
+    marginLeft: 4,
+  },
+  sectionTitleDisabled: {
+    color: '#9CA3AF',
+    opacity: 0.7,
+  },
+  viewAllTextDisabled: {
+    color: '#9CA3AF',
+  },
+  sectionDisabled: {
+    opacity: 0.6,
+  },
+  agendaCardDisabled: {
+    opacity: 0.7,
+    backgroundColor: '#F9FAFB',
+  },
+  agendaCardTitleDisabled: {
+    color: '#9CA3AF',
+    marginBottom: 4,
+  },
+  modernAgendaCardSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 16,
+  },
+  budgetLockedAmount: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    marginBottom: 12,
+  },
+  budgetDetailTextContainer: {
+    flex: 1,
+  },
+  budgetLockedValue: {
+    marginTop: 4,
+    alignItems: 'flex-start',
   },
 });

@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Calendar, Users, Wallet, Map, Check, X, AlertCircle } from 'lucide-react-native';
+import { Calendar, Users, Wallet, Map, Check, X, AlertCircle, Lock } from 'lucide-react-native';
 import { Card } from '@/src/components/ui/Card';
 import { RotasApi } from '@/src/services/api/modules/rotas';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { handleError } from '@/src/utils/errorHandler';
 import ErrorBoundary from '@/src/components/ErrorBoundary';
+import { useAppStore } from '@/src/store/useAppStore';
+import { apiClient } from '@/src/services/api/ApiClient';
 
 interface RotaItem {
   id: string;
@@ -41,6 +43,32 @@ export default function RotasScreen() {
   const fetchingRef = useRef(false);
   const retryCountRef = useRef(0);
   const lastFocusTimeRef = useRef(0);
+  const { empresaPlano, setEmpresaPlano } = useAppStore();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadEmpresaPlano();
+    }, [])
+  );
+
+  const loadEmpresaPlano = async () => {
+    try {
+      const resp = await apiClient.getEmpresa();
+      if (resp.success && resp.data) {
+        setEmpresaPlano(resp.data.plano || null);
+      }
+    } catch (error) {
+    }
+  };
+
+  const moduloDisponivel = (modulo: string): boolean => {
+    if (!empresaPlano) return true;
+    if (empresaPlano === 'TRACETRIP') return true;
+    if (empresaPlano === 'TRACEFROTAS') {
+      return modulo === 'Frota';
+    }
+    return true;
+  };
   
   useEffect(() => {
     retryCountRef.current = 0;
@@ -396,6 +424,126 @@ export default function RotasScreen() {
       </TouchableOpacity>
     );
   };
+
+  if (!moduloDisponivel('Rotas')) {
+    const rotaSimulada: RotaItem = {
+      id: '0',
+      nome: 'Viagem São Paulo - Rio de Janeiro',
+      dataInicio: new Date().toISOString(),
+      dataFim: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+      orcamento: 5000,
+      totalDespesas: 3200,
+      restante: 1800,
+      quantidadeUsuarios: 3,
+      quantidadeDias: 3,
+      status: 'em_andamento',
+      finalizarViagem: null,
+      isCurrent: true,
+    };
+
+    const theme = getStatusTheme(rotaSimulada);
+    const usadoPct = rotaSimulada.orcamento > 0 ? Math.min(100, Math.round((rotaSimulada.totalDespesas / rotaSimulada.orcamento) * 100)) : 0;
+
+    return (
+      <ErrorBoundary>
+        <SafeAreaView style={styles.container}>
+          <LinearGradient colors={["#254985", "#254985"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+            <View style={styles.heroRow}>
+              <View style={styles.heroTitleContainer}>
+                <View style={styles.heroIconContainer}>
+                  <Map size={24} color="#fff" />
+                </View>
+                <View>
+                  <Text style={styles.heroTitle}>Minhas Rotas</Text>
+                  <Text style={styles.heroSubtitle}>Gerencie suas viagens corporativas</Text>
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+
+          <View style={styles.filters}>
+            <TouchableOpacity 
+              style={[styles.filterButton, styles.filterButtonActive]}
+              disabled
+            >
+              <Text style={[styles.filterText, styles.filterTextActive]}>Futuras</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.filterButton}
+              disabled
+            >
+              <Text style={styles.filterText}>Em Andamento</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.filterButton}
+              disabled
+            >
+              <Text style={styles.filterText}>Passadas</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <View style={styles.blockedCardWrapper}>
+              <Card style={[styles.rotaCard, styles.blockedCard]}>
+                <View style={styles.cardContent}>
+                  <View style={styles.rotaHeader}>
+                    <Text style={styles.routeTitle}>{rotaSimulada.nome}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: theme.bg }]}> 
+                      <Text style={[styles.statusText, { color: theme.fg }]}>Em Andamento</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.metaRow}>
+                    <View style={styles.metaItem}>
+                      <Calendar size={16} color="#6B7280" />
+                      <Text style={styles.metaText}>{formatDate(rotaSimulada.dataInicio)} - {formatDate(rotaSimulada.dataFim)} ({rotaSimulada.quantidadeDias} dias)</Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                      <Users size={16} color="#6B7280" />
+                      <Text style={styles.metaText}>{rotaSimulada.quantidadeUsuarios} participantes</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.budgetRow}>
+                    <View style={styles.budgetItem}>
+                      <Text style={styles.budgetLabel}>Orçamento</Text>
+                      <Text style={styles.budgetValue}>{formatCurrency(rotaSimulada.orcamento)}</Text>
+                    </View>
+                    <View style={styles.budgetItem}>
+                      <Text style={styles.budgetLabel}>Despesas</Text>
+                      <Text style={[styles.budgetValue, { color: '#DC2626' }]}>{formatCurrency(rotaSimulada.totalDespesas)}</Text>
+                    </View>
+                    <View style={styles.budgetItem}>
+                      <Text style={styles.budgetLabel}>Restante</Text>
+                      <Text style={[styles.budgetValue, { color: '#059669' }]}>{formatCurrency(rotaSimulada.restante)}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.progressWrap}>
+                    <View style={styles.progressTrack}>
+                      <View style={[styles.progressFill, { width: `${usadoPct}%` }]} />
+                    </View>
+                    <Text style={styles.progressText}>{usadoPct}% do orçamento utilizado</Text>
+                  </View>
+                </View>
+              </Card>
+              <View style={styles.blockedOverlay}>
+                <View style={styles.blockedOverlayContent}>
+                  <Lock size={32} color="#9CA3AF" />
+                  <Text style={styles.blockedOverlayTitle}>Módulo Indisponível</Text>
+                  <Text style={styles.blockedOverlaySubtitle}>
+                    Este módulo está disponível apenas para assinantes do plano TraceTrip
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -845,4 +993,63 @@ const styles = StyleSheet.create({
   emptySubtext: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 16 },
   retryButton: { marginTop: 12, backgroundColor: '#254985', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
   retryText: { color: 'white', fontWeight: '600', fontSize: 14 },
+  blockedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    backgroundColor: '#FFFFFF',
+  },
+  blockedContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  blockedTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 8,
+  },
+  blockedSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  blockedCardWrapper: {
+    position: 'relative',
+    margin: 16,
+  },
+  blockedCard: {
+    opacity: 0.75,
+  },
+  blockedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  blockedOverlayContent: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  blockedOverlayTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 4,
+  },
+  blockedOverlaySubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
 });

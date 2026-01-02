@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Dimensions, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Dimensions, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Calendar as CalendarIcon, Clock, MapPin, CheckSquare, X } from 'lucide-react-native';
+import { Calendar as CalendarIcon, Clock, MapPin, CheckSquare, X, Lock } from 'lucide-react-native';
 import { Card } from '@/src/components/ui/Card';
 import { Agenda as AgendaType } from '@/src/types';
 import { router, useNavigation, useFocusEffect } from 'expo-router';
@@ -11,6 +11,8 @@ import { Calendar, LocaleConfig, DateData } from 'react-native-calendars';
 import { handleError } from '@/src/utils/errorHandler';
 import ErrorBoundary from '@/src/components/ErrorBoundary';
 import { DaySelector } from '@/src/components/DaySelector';
+import { useAppStore } from '@/src/store/useAppStore';
+import { apiClient } from '@/src/services/api/ApiClient';
 
 LocaleConfig.locales['ptBR'] = {
   monthNames: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'],
@@ -42,6 +44,32 @@ export default function AgendasScreen() {
   const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
   const [modalTipoAgenda, setModalTipoAgenda] = useState(true);
   const [tipoAgendaSelecionado, setTipoAgendaSelecionado] = useState<'compromissos' | 'frota' | null>(null);
+  const { empresaPlano, setEmpresaPlano } = useAppStore();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadEmpresaPlano();
+    }, [])
+  );
+
+  const loadEmpresaPlano = async () => {
+    try {
+      const resp = await apiClient.getEmpresa();
+      if (resp.success && resp.data) {
+        setEmpresaPlano(resp.data.plano || null);
+      }
+    } catch (error) {
+    }
+  };
+
+  const moduloDisponivel = (modulo: string): boolean => {
+    if (!empresaPlano) return true;
+    if (empresaPlano === 'TRACETRIP') return true;
+    if (empresaPlano === 'TRACEFROTAS') {
+      return modulo === 'Frota';
+    }
+    return true;
+  };
   
   const loadCurrentMonth = () => {
     const today = new Date();
@@ -585,20 +613,43 @@ export default function AgendasScreen() {
               <Text style={styles.modalTitle}>Selecione o tipo de agenda</Text>
               
               <TouchableOpacity
-                style={styles.modalOption}
+                style={[
+                  styles.modalOption,
+                  !moduloDisponivel('Viagens') && styles.modalOptionDisabled
+                ]}
                 onPress={() => {
+                  if (!moduloDisponivel('Viagens')) {
+                    Alert.alert(
+                      'Módulo Indisponível',
+                      'Este módulo está disponível apenas para assinantes do plano TraceTrip.',
+                      [{ text: 'OK' }]
+                    );
+                    return;
+                  }
                   setTipoAgendaSelecionado('compromissos');
                   setModalTipoAgenda(false);
                   setViewMode('lista');
                   loadCurrentMonth();
                 }}
+                disabled={!moduloDisponivel('Viagens')}
               >
                 <View style={styles.modalOptionIcon}>
-                  <CalendarIcon size={24} color="#254985" />
+                  <CalendarIcon size={24} color={moduloDisponivel('Viagens') ? "#254985" : "#9CA3AF"} />
                 </View>
                 <View style={styles.modalOptionContent}>
-                  <Text style={styles.modalOptionTitle}>Agenda de Compromissos</Text>
-                  <Text style={styles.modalOptionSubtitle}>Visualize e gerencie seus compromissos</Text>
+                  <View style={styles.modalOptionTitleRow}>
+                    <Text style={[
+                      styles.modalOptionTitle,
+                      !moduloDisponivel('Viagens') && styles.modalOptionTitleDisabled
+                    ]}>Agenda de Compromissos</Text>
+                    {!moduloDisponivel('Viagens') && (
+                      <Lock size={16} color="#9CA3AF" />
+                    )}
+                  </View>
+                  <Text style={[
+                    styles.modalOptionSubtitle,
+                    !moduloDisponivel('Viagens') && styles.modalOptionSubtitleDisabled
+                  ]}>Visualize e gerencie seus compromissos</Text>
                 </View>
               </TouchableOpacity>
 
@@ -609,6 +660,7 @@ export default function AgendasScreen() {
                   setModalTipoAgenda(false);
                   router.push('/(tabs)/agenda-frota');
                 }}
+                activeOpacity={0.7}
               >
                 <View style={styles.modalOptionIcon}>
                   <MapPin size={24} color="#254985" />
@@ -1030,5 +1082,19 @@ const styles = StyleSheet.create({
   modalOptionSubtitle: {
     fontSize: 13,
     color: '#64748B',
+  },
+  modalOptionDisabled: {
+    opacity: 0.6,
+  },
+  modalOptionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modalOptionTitleDisabled: {
+    color: '#9CA3AF',
+  },
+  modalOptionSubtitleDisabled: {
+    color: '#D1D5DB',
   },
 });
