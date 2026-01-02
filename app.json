@@ -4,7 +4,7 @@
     "slug": "trace-trip",
     "version": "1.0.8",
     "orientation": "portrait",
-    "icon": "./assets/icone_t.png",
+    "icon": "./assets/logo.png",
     "splash": {
       "image": "./assets/icone_t.png",
       "resizeMode": "contain",

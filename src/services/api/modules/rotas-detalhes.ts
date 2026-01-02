@@ -66,8 +66,11 @@ export interface DetalhesRotaResponse {
     estatisticas: EstatisticasRota;
 }
 
+let pendingRequest: Promise<{ success: boolean; data?: DetalhesRotaResponse; message?: string }> | null = null;
+let lastRequestId: number | undefined = undefined;
+
 export const RotasDetalhesApi = {
-    async getDetalhesRota(): Promise<{
+    async getDetalhesRota(id?: number): Promise<{
         success: boolean;
         data?: DetalhesRotaResponse | any;
         message?: string;
